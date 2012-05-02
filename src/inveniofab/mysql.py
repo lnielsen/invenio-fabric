@@ -29,6 +29,7 @@ from fabric.contrib.console import confirm
 from fabric.contrib.files import exists
 from inveniofab.env import env_settings
 from inveniofab.utils import slc_version
+from pipes import quote
 
 @roles('db')
 @task
@@ -65,8 +66,7 @@ def mysql_createdb():
         ctx['password'] = "my123p$ss" if not newpw else newpw
 
     # Escape quote characters
-    ctx['password'] = ctx['password'].replace('"', '\"')
-    ctx['password'] = ctx['password'].replace("'", "\'")
+    ctx['password'] = quote(ctx['password'])
 
     # Run commands
     run('mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS %(name)s DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci"' % ctx)

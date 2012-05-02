@@ -21,3 +21,4 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 #
 include README.md AUTHORS LICENSE
+recursive-include examples *

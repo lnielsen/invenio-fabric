@@ -31,12 +31,12 @@ of your file::
 from inveniofab.apache import apache_clean, apache_configure, apache_prepare, \
     apache_restart
 from inveniofab.bibsched import bibsched_halt, bibsched_schedule, bibsched_start, \
-    bibsched_status, bibsched_stop
-from inveniofab.env import bootstrap, clean, deploy, install
+    bibsched_status, bibsched_stop, bibsched_clear_schedule
+from inveniofab.env import bootstrap, clean, deploy, install, copy
 from inveniofab.invenio import invenio_clean, invenio_configure, invenio_deploy, \
-    invenio_install, invenio_updateconf
+    invenio_install, invenio_updateconf, invenio_reset_adminpw, invenio_fix_filelinks
 from inveniofab.mysql import mysql_prepare, mysql_loaddump, mysql_dropdb, \
-    mysql_createdb
+    mysql_createdb, mysql_copy
 from inveniofab.python import python_clean, python_prepare
 from inveniofab.system import crontab_install, crontab_show, crontab_uninstall, \
-    libreoffice_prepare, selinux_prepare
+    libreoffice_prepare, selinux_prepare, copy_files

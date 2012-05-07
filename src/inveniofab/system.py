@@ -65,6 +65,36 @@ def libreoffice_prepare():
     sudo("chmod -R 755 /opt/invenio/var/tmp/ooffice-tmp-files")
     sudo("/opt/invenio/bin/inveniocfg --check-openoffice", user = "apache")
 
+
+@roles('web')
+@task
+def copy_files():
+    """
+    Copy entire files from one system to another
+    """
+    copyconf = env_settings('system')['copy']
+    localurl = copyconf['local']
+    remoteurl = copyconf['remote']
+    files = copyconf['files']
+    dirs = copyconf['dirs']
+    owner = copyconf['owner']
+    
+    for f in files:
+        l = "%s%s" % (localurl, f)
+        r = "%s%s" % (remoteurl, f)
+        sudo("scp %s %s" % (r, l))
+        if owner:
+            sudo("chown %s %s" % (owner, l))
+    
+    for d in dirs:
+        l = "%s%s" % (localurl, d)
+        r = "%s%s" % (remoteurl, d)
+
+        sudo("rsync -e ssh -av %s %s" % (r, l))
+        if owner:
+            sudo("chown -R %s %s" % (owner, l))
+
+
 # =====================
 # Crontab library tasks
 # =====================

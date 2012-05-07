@@ -26,6 +26,7 @@ deploying and running Invenio.
 """
 
 from fabric.api import env, execute, abort, task
+from fabric import state
 
 # ==============
 # Compound tasks
@@ -37,6 +38,7 @@ def install():
     """
     _run_task_group('install')
 
+
 @task
 def clean():
     """
@@ -44,12 +46,14 @@ def clean():
     """
     _run_task_group('clean')
 
+
 @task
 def deploy():
     """
     Deploy Invenio from latest master 
     """
     _run_task_group('deploy')
+
 
 @task
 def bootstrap():
@@ -59,26 +63,45 @@ def bootstrap():
     _run_task_group('bootstrap')
 
 
-def _run_task_group(arg):
+@task
+def copy(from_env):
+    """
+    Copy data from one environment to another  
+    """
+    env_load(from_env)
+    env_settings('copy')['from_env'] = from_env 
+    _run_task_group('copy')
+
+
+def _run_task_group(task_name, *args, **kwargs):
     """
     Helper function to run a task group
     """
     try:
-        import inveniofab.api
-        
-        for task in env_settings('tasks')[arg]:
+        for task in env_settings('tasks')[task_name]:
             if not callable(task):
-                task = getattr(inveniofab.api, task)
-            execute(task)
+                task = state.commands[task]
+            execute(task, *args, **kwargs)
     except AttributeError:
-        abort("No %s tasks defined." % arg)
+        abort("No %s tasks defined." % task_name)
+    except KeyError:
+        abort("Subtask %s not found." % task)
+
+
+def _copy_not_supported(from_env):
+    """
+    By default, copying an environment is not supported
+    """
+    current_env = env_active()
+    abort("Copying %s to %s is not supported." % (from_env, current_env))
+
 
 # =======================
 # Default Fabric settings
 # =======================
 def env_init(name):
     """
-    Initialize default environment
+    Initialize a new environment with default settings.
     
     ENV_SETTINGS is a dictionary of settings that is initialized by
     an environment. The settings are used to configure the tasks
@@ -95,12 +118,10 @@ def env_init(name):
     if not hasattr(env, 'ENVIRONMENTS'):
         env.ENVIRONMENTS = {
             'defs' : {},
-            'default' : None,
             'active' : None,
         }
 
     if name not in env.ENVIRONMENTS:
-        env_setdefault(name)
         env.ENVIRONMENTS['defs'][name] = {
             'roledefs' : {
                 'web' : [],
@@ -109,10 +130,11 @@ def env_init(name):
             },
             'settings' : {
                 'tasks' : {
-                    'bootstrap' : ['python_prepare', 'selinux_prepare', 'mysql_prepare', 'mysql_createdb', 'apache_prepare', 'apache_configure'],
-                    'install' : ['invenio_install', 'invenio_configure', 'libreoffice_prepare', 'apache_restart'],
+                    'bootstrap' : ['python_prepare', 'selinux_prepare', 'mysql_prepare', 'apache_prepare'],
+                    'install' : ['mysql_createdb', 'apache_configure', 'invenio_install', 'invenio_configure', 'libreoffice_prepare', 'apache_restart', 'crontab_install'],
                     'deploy' : ['invenio_deploy', 'apache_restart'],
-                    'clean' : ['python_clean', 'apache_clean', 'apache_restart', 'mysql_dropdb', 'invenio_clean',],
+                    'clean' : ['crontab_uninstall', 'bibsched_halt', 'apache_clean', 'apache_restart', 'python_clean', 'mysql_dropdb', 'invenio_clean', ],
+                    'copy' : [_copy_not_supported],
                 },
                 'bibsched' : {
                     'schedule' : [
@@ -131,6 +153,9 @@ def env_init(name):
                         "oaiharvest -s 24h  -u admin",
                     ]
                 },
+                'copy' : {
+                    'from_env' : None,
+                },
                 'invenio' : {
                     'conffile' : [],
                 },
@@ -143,42 +168,86 @@ def env_init(name):
                 },
             },
         }
-    env_setdefault(name)
-    return (env.ENVIRONMENTS['defs'][name]['roledefs'], env.ENVIRONMENTS['defs'][name]['settings']) 
-        
+    return (env.ENVIRONMENTS['defs'][name]['roledefs'], env.ENVIRONMENTS['defs'][name]['settings'])
 
-def env_setdefault(name):
-    """
-    Set an initialized environment as default (used when editing the settings)
-    """
-    if not hasattr(env, 'ENVIRONMENTS'):
-        abort("You must first initialize an environment before calling env_setdefault.")
-    env.ENVIRONMENTS['default'] = name
-    
 
-def env_default():
-    """
-    Get the current default environment (used when editing the settings).
-    """
-    try:
-        return env.ENVIRONMENTS['defs'][env.ENVIRONMENTS['default']]
-    except AttributeError:
-        abort("You must first initialize an environment before calling env_getdefault.")
-    except KeyError:
-        abort("No default environment set.")
-    
-
-def env_activate(name):
+def env_setactive(name):
     """
     Activate an environment (so env_settings will return values from this env).
-    """
-    env.roledefs = env.ENVIRONMENTS['defs'][name]['roledefs']
-    env.ENV_SETTINGS = env.ENVIRONMENTS['defs'][name]['settings']
-
     
+    If name is None, the current active environment will be deactivated.
+    """
+    try:
+        if name:
+            env.roledefs = env.ENVIRONMENTS['defs'][name]['roledefs']
+            env.ENV_SETTINGS = env.ENVIRONMENTS['defs'][name]['settings']
+            env.ENVIRONMENTS['active'] = name
+        else:
+            env.roledefs = {}
+            env.ENV_SETTINGS = {}
+            env.ENVIRONMENTS['active'] = None
+    except KeyError:
+        abort("Cannot activate environment %s - it is not defined." % name)
+
+
+def env_active():
+    """
+    Get name of the active environment
+    """
+    try:
+        return env.ENVIRONMENTS['active']
+    except AttributeError:
+        return None
+
+def env_loaded(name):
+    """
+    Determine if an environment has been loaded.
+    """
+    try:
+        return name in env.ENVIRONMENTS['defs']
+    except (KeyError, AttributeError):
+        return False
+
+
+def env_load(name):
+    """
+    Load an environment without activating it.
+    
+    Only environments without any parameters can be loaded.
+    """
+    if not env_loaded(name):
+        if name not in state.commands:
+            abort("Environment %s not found" % name)
+
+        # Get the current active environment
+        current_env = env_active()
+
+        env_load_func = state.commands[name]
+        env_load_func()
+
+        # Reactivate current environment
+        env_setactive(current_env)
+
+
 def env_settings(module, envname = None):
     """
     Get settings for a particular module.
+    
+    Example (get 'conffile' setting for 'invenio' module)::
+    
+      conffile = env_settings('invenio')['conffile']
     """
-    return env.ENV_SETTINGS[module] if not envname else env.ENVIRONMENTS['defs'][envname]['settings'][module]
-
+    try:
+        if not envname:
+            return env.ENV_SETTINGS[module]
+        else:
+            if envname not in env.ENVIRONMENTS['defs'][envname]:
+                env_load(envname)
+            return env.ENVIRONMENTS['defs'][envname]['settings'][module]
+    except KeyError:
+        if envname:
+            abort("Misconfiguration - module %s or environment %s not found." % (module, envname))
+        else:
+            abort("Misconfiguration - module %s not found." % module)
+    except AttributeError:
+        abort("No environment loaded.")

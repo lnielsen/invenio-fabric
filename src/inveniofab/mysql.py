@@ -24,12 +24,10 @@
 Library tasks for configuring and running MySQL for Invenio.
 """
 
-from fabric.api import roles, sudo, env, prompt, run, abort, task
+from fabric.api import roles, sudo, env, prompt, run, abort, task, settings
 from fabric.contrib.console import confirm
 from fabric.contrib.files import exists
-from inveniofab.env import env_settings
-from inveniofab.utils import slc_version
-from pipes import quote
+from inveniofab.env import env_settings, env_load
 
 @roles('db')
 @task
@@ -44,7 +42,7 @@ def mysql_prepare():
         sudo("/usr/bin/mysql_secure_installation")
         
     # Create DB dump dir
-    dumpdir = env_settings('mysql')['dbdump_dir'] or '/opt/invenio/var/log'
+    dumpdir = env_settings('mysql')['dbdump_dir'] or '/opt/invenio/var/log/'
     if dumpdir:
         sudo("mkdir -p %s" % dumpdir, user="apache")
         sudo("chown apache:apache %s" % dumpdir, user="apache")
@@ -66,11 +64,11 @@ def mysql_createdb():
         ctx['password'] = "my123p$ss" if not newpw else newpw
 
     # Escape quote characters
-    ctx['password'] = quote(ctx['password'])
+    ctx['password'] = ctx['password'].replace("'","\'").replace('"','\"').replace('$','\\$')
 
     # Run commands
     run('mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS %(name)s DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci"' % ctx)
-    run('mysql -u root -p -e "GRANT ALL PRIVILEGES ON %(name)s.* TO %(user)s@localhost IDENTIFIED BY \'%(password)s\';"' % ctx)
+    run('mysql -u root -p -e "GRANT ALL PRIVILEGES ON %(name)s.* TO %(user)s@localhost IDENTIFIED BY \'%(password)s\';"' % ctx, shell=False)
     run('mysqladmin -u root -p flush-privileges')
 
 
@@ -86,9 +84,10 @@ def mysql_dropdb():
         ctx['user'] = ctx['name']
     
     # Run commands
-    run('mysql -u root -p -e "DROP DATABASE IF EXISTS %(name)s"' % ctx)
-    run('mysql -u root -p -e "REVOKE ALL PRIVILEGES ON %(name)s.* FROM %(user)s@localhost"' % ctx)
-    run('mysqladmin -u root -p flush-privileges')
+    with settings(warn_only = True):
+        run('mysql -u root -p -e "DROP DATABASE IF EXISTS %(name)s"' % ctx)
+        run('mysql -u root -p -e "REVOKE ALL PRIVILEGES ON %(name)s.* FROM %(user)s@localhost"' % ctx)
+        run('mysqladmin -u root -p flush-privileges')
 
 
 @roles('db')
@@ -106,3 +105,30 @@ def mysql_loaddump( dumpfile ):
         run('mysql -u root -p -e "DROP DATABASE IF EXISTS %(name)s"' % ctx)
         run('mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS %(name)s DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci"' % ctx)
         run('mysql -u root -f -p %(name)s < %(dumpfile)s' % ctx)
+        
+        
+@roles('db')
+@task
+def mysql_copy( from_env ):
+    """
+    Copy database from an environment using the latest available dump.
+    
+    Currently it is assumed that the dump file is accessible on the
+    same path on both environment host systems. This usually means that
+    the dumps are stored on a shared network storage. 
+    """
+    env_load( from_env )
+    
+    from_dbdump_dir = env_settings('mysql', envname = from_env)['dbdump_dir']
+    
+    if not from_dbdump_dir:
+        abort("Database dump directory not specified in %s" % from_env)
+    
+    # Find latest database dump.
+    try:
+        tmp = run('ls -1t %s*.sql' % from_dbdump_dir)
+        latest_dumpfile = tmp.splitlines()[0]
+    except Exception:
+        abort("Could not find latest dump file")
+        
+    mysql_loaddump(latest_dumpfile)

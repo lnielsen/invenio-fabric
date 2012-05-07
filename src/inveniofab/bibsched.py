@@ -24,7 +24,7 @@
 Library tasks for configuring and running bibsched.
 """
 
-from fabric.api import sudo, env, roles, task
+from fabric.api import sudo, env, roles, task, hide, settings
 from inveniofab.env import env_settings
 
 @roles('backend')
@@ -51,7 +51,8 @@ def bibsched_halt():
     """
     Halt bibsched
     """
-    sudo("/opt/invenio/bin/bibsched halt", user="apache")
+    with settings(warn_only = True):
+        sudo("/opt/invenio/bin/bibsched halt", user="apache")
 
     
 @roles('backend')
@@ -62,7 +63,7 @@ def bibsched_status():
     """
     sudo("/opt/invenio/bin/bibsched status", user="apache")
 
-
+    
 @roles('backend')
 @task
 def bibsched_schedule():
@@ -74,5 +75,28 @@ def bibsched_schedule():
     except KeyError:
         tasks = []
         
-    for t in tasks:
-        sudo("/opt/invenio/bin/%s" % t, user="apache")
+    with settings(warn_only = True):
+        for t in tasks:
+            sudo("/opt/invenio/bin/%s" % t, user="apache")
+
+
+@roles('backend')
+@task
+def bibsched_clear_schedule():
+    """
+    Clear all bibsched schedule tasks
+    """
+    if is_running():
+        bibsched_halt()
+       
+    sudo("echo \"DELETE FROM schTASK;\" | sudo -u apache /opt/invenio/bin/dbexec")
+        
+    
+def is_running():
+    """
+    Determine if bibsched is running
+    """
+    with settings(hide('warnings', 'running', 'stdout', 'stderr'), warn_only = True):
+        output = sudo("/opt/invenio/bin/bibsched status", user="apache")
+    
+    return "BibSched queue running mode: AUTOMATIC" in output

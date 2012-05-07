@@ -34,12 +34,6 @@ Example usage:
   fab -u <user> env_atlantis:<host> install
   fab -u <user> env_atlantis:<host> deploy
   fab -u <user> env_atlantis:<host> clean
-  
-Requirements:
-
-  * User must have sudo rights to remote machine
-  * Configuration files must be stored locally (see path for each env definiton)
-  * Fabric 1.4+
 """
 
 from fabric.api import task

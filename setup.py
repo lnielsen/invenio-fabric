@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# A Fabric file for installing, deploying and running Invenio on CERN 
+# A Fabric file for installing, deploying and running Invenio on CERN
 # SLC5/6 hosts.
 #
 # Lars Holm Nielsen <lars.holm.nielsen@cern.ch>
@@ -24,18 +24,18 @@
 from setuptools import setup, find_packages
 
 setup(
-        name = 'invenio-fabric',
-        version = '0.1',
-        packages = find_packages('src'),
-        package_dir = { '': 'src' },
-        include_package_data = False,
-        zip_safe = False,
-        install_requires = [ 'distribute', 'Fabric>=1.4', ],
-        
-        author = 'Lars Holm Nielsen',
-        author_email = 'lars.holm.nielsen@cern.ch',
-        description = 'Fabric tasks for installing, deploying and running Invenio on CERN SLC5/6 hosts.',
-        license = "GPL",
-        keywords = "invenio fabric cern",
-        url = "https://github.com/lnielsen-cern/invenio-fabric"
+    name='invenio-fabric',
+    version='0.1',
+    packages=find_packages('src'),
+    package_dir={'': 'src'},
+    include_package_data=False,
+    zip_safe=False,
+    install_requires=['distribute', 'Fabric>=1.4','Jinja2' ],
+
+    author='Lars Holm Nielsen',
+    author_email='lars.holm.nielsen@cern.ch',
+    description='Fabric tasks for installing, deploying and running Invenio on CERN SLC5/6 hosts.',
+    license="GPL",
+    keywords="invenio fabric cern",
+    url="https://github.com/lnielsen-cern/invenio-fabric"
 )

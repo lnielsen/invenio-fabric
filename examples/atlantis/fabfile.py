@@ -21,7 +21,7 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 """
-Fabric tasks for bootstrapping, installing and deploying Invenio on 
+Fabric tasks for bootstrapping, installing and deploying Invenio demo site on 
 CERN Scientific Linux 5/6 hosts.
 
 The tasks follow the guidelines on installing Invenio on SLC5:

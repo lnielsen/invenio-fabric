@@ -20,11 +20,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
-from fabric.api import roles, cd, run, sudo, abort, env, put, task, hide
-from fabric.contrib.files import comment, sed, exists
-from inveniofab.env import env_settings
-from inveniofab.utils import slc_version
+from fabric.api import roles, cd, run, sudo, abort, env, put, task, hide, settings
+from fabric.contrib.files import comment, sed, exists, upload_template
+from inveniofab.env import env_settings, env_settings_ctx
+from inveniofab.utils import slc_version, source_checkout, source_update, source_clean, render_file_template
 import os
+import socket
 
 # ============================
 # Invenio library tasks (SLC5)
@@ -35,31 +36,33 @@ def invenio_install():
     """
     Install Invenio.
     """
-    if not exists("/tmp/invenio"):
-        with cd("/tmp"):
-            run("git clone http://invenio-software.org/repo/invenio")
+    conf = env_settings("invenio")
+    source_checkout("/tmp/invenio", repo=conf["repository"], source_dir=conf["source_dir"])
 
     with cd("/tmp/invenio"):
         run("aclocal && automake -a && autoconf")
-        run("./configure && make")
-        sudo("make install", user = "apache")
-        sudo("make install-mathjax-plugin", user = "apache")
-        sudo("make install-ckeditor-plugin", user = "apache")
-        sudo("make install-pdfa-helper-files", user = "apache")
-        sudo("make install-jquery-plugins", user = "apache")
-
-
+        run("./configure & make clean")
+        run("make")
+        sudo("make install", user="apache")
+        sudo("make install-mathjax-plugin", user="apache")
+        sudo("make install-ckeditor-plugin", user="apache")
+        sudo("make install-pdfa-helper-files", user="apache")
+        sudo("make install-jquery-plugins", user="apache")
+        
+        
 @roles('web')
 @task
 def invenio_deploy():
     """
     Deploy latest Invenio master branch
     """
+    conf = env_settings('invenio')
+    source_update("/tmp/invenio", repo=conf["repository"], source_dir=conf["source_dir"])
+    
     with cd("/tmp/invenio"):
-        run("git pull")
         run("make -s")
-        sudo("make install", user = "apache")
-        sudo("/opt/invenio/bin/inveniocfg --update-all", user = "apache")
+        sudo("make install", user="apache")
+        sudo("/opt/invenio/bin/inveniocfg --update-all", user="apache")
 
 
 @roles('web')
@@ -68,48 +71,62 @@ def invenio_clean():
     """
     Clean Invenio installation
     """
-    with cd("/tmp"):
-        sudo("rm -Rf /tmp/invenio")
-        sudo("rm -Rf /opt/invenio")
+    conf = env_settings('invenio')
+    source_clean("/tmp/invenio", repo=conf["repository"], source_dir=conf["source_dir"])    
+    sudo("rm -Rf /opt/invenio")
 
 
 @roles('web')
 @task
-def invenio_configure(host = None):
+def invenio_configure(host=None):
     """
     Configure Invenio
     """
-    invenio_updateconf(host = host)
-    sudo("/opt/invenio/bin/inveniocfg --create-tables", user = "apache")
-    sudo("/opt/invenio/bin/inveniocfg --create-apache-conf", user = "apache")
+    invenio_updateconf(host=host)
+    with settings( warn_only=True ):
+        sudo("/opt/invenio/bin/inveniocfg --create-tables", user="apache")
+        sudo("/opt/invenio/bin/inveniocfg --create-apache-conf", user="apache")
 
     slcver = slc_version()
     if slcver and slcver[0] < 6:
-        comment("/opt/invenio/etc/apache/invenio-apache-vhost.conf", 'WSGIImportScript', use_sudo = True)
-        comment("/opt/invenio/etc/apache/invenio-apache-vhost-ssl.conf", 'WSGIImportScript', use_sudo = True)
+        comment("/opt/invenio/etc/apache/invenio-apache-vhost.conf", 'WSGIImportScript', use_sudo=True)
+        comment("/opt/invenio/etc/apache/invenio-apache-vhost-ssl.conf", 'WSGIImportScript', use_sudo=True)
+        if env.user == 'vagrant':
+            # --create-apache-conf does not probably detect an ip address on 
+            # vagrant boxes
+            try:
+                ip = socket.gethostbyname(env.host_string)
+                sed("/opt/invenio/etc/apache/invenio-apache-vhost.conf", "^NameVirtualHost ([0-9.]+):([0-9]+)$", "NameVirtualHost %s:\\2" % ip, use_sudo = True)
+                sed("/opt/invenio/etc/apache/invenio-apache-vhost.conf", "^<VirtualHost ([0-9]+):([0-9]+)>$", "<VirtualHost %s:\\2>" % ip, use_sudo = True)
+            except IOError:
+                pass
 
 
 @roles('web')
 @task
-def invenio_updateconf(host = None):
+def invenio_updateconf(host=None):
     """
     Update Invenio configuration
     """
-    conffile = env_settings('invenio')['conffile'] or os.path.join(os.getcwd(), 'invenio-local.conf')
+    # Get name of configuration (specificed in conf or guesses)
+    conf = env_settings('invenio') 
+    conffile = conf['conffile'] or os.path.join(os.getcwd(), 'invenio-local.conf')
+    
+    # Render conf template and upload
     remote_conffile = "/opt/invenio/etc/invenio-local.conf"
     if not os.path.exists(conffile):
         abort("Configuration file %s does not exists." % conffile)
-    put(conffile, remote_conffile, use_sudo = True)
-    sudo("chown apache:apache %s" % remote_conffile)
-    sudo("chmod 644 %s" % remote_conffile)
-
-    # Adapt configuration file if needed
-    if host:
-        _edit_simple_cfg_option(remote_conffile, 'CFG_SITE_URL', 'http://%s' % host, use_sudo = True)
-        _edit_simple_cfg_option(remote_conffile, 'CFG_SITE_SECURE_URL', 'https://%s' % host, use_sudo = True)
-
-    sudo("/opt/invenio/bin/inveniocfg --reset-all", user = "apache")
-    sudo("/opt/invenio/bin/inveniocfg --update-all", user = "apache")
+    
+    tmpfile = render_file_template(conffile, env_settings_ctx())
+    try:
+        put(tmpfile, remote_conffile, use_sudo=True)
+    
+        sudo("chown apache:apache %s" % remote_conffile)
+        sudo("chmod 644 %s" % remote_conffile)
+        sudo("/opt/invenio/bin/inveniocfg --update-all", user="apache")
+    finally:
+        if os.path.exists(tmpfile):
+            os.remove(tmpfile)
 
 
 @roles('web')
@@ -154,10 +171,10 @@ def invenio_fix_filelinks(from_host):
         # Upload MARCXML file
         if exists("/opt/invenio/var/tmp/fixfilelinksinput.xml"):
             sudo("rm -f /opt/invenio/var/tmp/fixfilelinksinput.xml")
-        put("fixfilelinksinput.xml", "/opt/invenio/var/tmp/fixfilelinksinput.xml", use_sudo = True)
+        put("fixfilelinksinput.xml", "/opt/invenio/var/tmp/fixfilelinksinput.xml", use_sudo=True)
         sudo("chown apache:apache /opt/invenio/var/tmp/fixfilelinksinput.xml")
-        sudo("chmod 644 /opt/invenio/var/tmp/fixfilelinksinput.xml", user = "apache")
-        sudo("/opt/invenio/bin/bibupload -d /opt/invenio/var/tmp/fixfilelinksinput.xml", user = "apache")
+        sudo("chmod 644 /opt/invenio/var/tmp/fixfilelinksinput.xml", user="apache")
+        sudo("/opt/invenio/bin/bibupload -d /opt/invenio/var/tmp/fixfilelinksinput.xml", user="apache")
     finally:
         if os.path.exists("fixfilelinksinput.xml"):
             os.remove("fixfilelinksinput.xml")

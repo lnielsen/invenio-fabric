@@ -69,7 +69,7 @@ def copy(from_env):
     Copy data from one environment to another  
     """
     env_load(from_env)
-    env_settings('copy')['from_env'] = from_env 
+    env_settings('copy')['from_env'] = from_env
     _run_task_group('copy')
 
 
@@ -130,8 +130,8 @@ def env_init(name):
             },
             'settings' : {
                 'tasks' : {
-                    'bootstrap' : ['python_prepare', 'selinux_prepare', 'mysql_prepare', 'apache_prepare'],
-                    'install' : ['mysql_createdb', 'apache_configure', 'invenio_install', 'invenio_configure', 'libreoffice_prepare', 'apache_restart', 'crontab_install'],
+                    'bootstrap' : ['selinux_prepare', 'mysql_prepare', 'apache_prepare'],
+                    'install' : ['mysql_createdb', 'python_prepare', 'apache_configure', 'invenio_install', 'invenio_configure', 'libreoffice_prepare', 'apache_restart', 'crontab_install'],
                     'deploy' : ['invenio_deploy', 'apache_restart'],
                     'clean' : ['crontab_uninstall', 'bibsched_halt', 'apache_clean', 'apache_restart', 'python_clean', 'mysql_dropdb', 'invenio_clean', ],
                     'copy' : [_copy_not_supported],
@@ -157,7 +157,11 @@ def env_init(name):
                     'from_env' : None,
                 },
                 'invenio' : {
-                    'conffile' : [],
+                    'repository' : 'http://invenio-software.org/repo/invenio',
+                    'source_dir' : None,
+                    'host' : None,
+                    'conffile' : '%s.conf' % name,
+                    'admin ' : None,
                 },
                 'mysql' : {
                     'db' : { 'name' : 'invenio', },
@@ -229,7 +233,7 @@ def env_load(name):
         env_setactive(current_env)
 
 
-def env_settings(module, envname = None):
+def env_settings(module, envname=None):
     """
     Get settings for a particular module.
     
@@ -241,7 +245,7 @@ def env_settings(module, envname = None):
         if not envname:
             return env.ENV_SETTINGS[module]
         else:
-            if envname not in env.ENVIRONMENTS['defs'][envname]:
+            if envname not in env.ENVIRONMENTS['defs']:
                 env_load(envname)
             return env.ENVIRONMENTS['defs'][envname]['settings'][module]
     except KeyError:
@@ -251,3 +255,22 @@ def env_settings(module, envname = None):
             abort("Misconfiguration - module %s not found." % module)
     except AttributeError:
         abort("No environment loaded.")
+
+
+def env_settings_ctx(envname=None):
+    """
+    Get all settings as a context usable for  a Jinja template
+    """
+    try:
+        if not envname:
+            return env.ENV_SETTINGS
+        else:
+            if envname not in env.ENVIRONMENTS['defs']:
+                env_load(envname)
+            return env.ENVIRONMENTS['defs'][envname]['settings']
+    except KeyError:
+        abort("Misconfiguration - environment %s not found." % envname)
+    except AttributeError:
+        abort("No environment loaded.")
+
+

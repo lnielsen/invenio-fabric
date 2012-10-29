@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-# A Fabric file for installing, deploying and running Invenio on CERN 
-# SLC5/6 hosts.
-#
-# Lars Holm Nielsen <lars.holm.nielsen@cern.ch>
-#
 # Copyright (C) 2012 CERN.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -21,256 +16,192 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 """
-Configurable compound tasks for bootstrapping, installing, configuring, 
-deploying and running Invenio. 
+Fabric tasks for defining environments. Specifically it will setup default
+values, as well as allow loading an environment without activating it (useful
+if you want to say copy a database from production to integration, and thus
+needs access to both environments at the same time.
 """
 
-from fabric.api import env, execute, abort, task
+from fabric.api import execute, abort, task
 from fabric import state
+from fabric.api import task, abort
+from jinja2 import Environment, FileSystemLoader
+import copy
+import os
 
-# ==============
-# Compound tasks
-# ==============
+def env_create(name, defaults_func=None, activate=True, **kwargs):
+    """
+    Create a new environment (e.g. integration, production,
+    local). Minimal usage::
+
+      @task
+      def prod(activate=True, **kwargs)
+          env = env_create('prod', activate=activate, **kwargs)
+
+          env.CFG_
+          return env
+
+    @param name: str, Name of environment (must be same as task name).
+    @param defaults_func: callable taking a dictionary as argument and returns
+        the same dictionary. Used to setup defaults in the environment.
+    @param activate: Bool, True to activate the environment, or False to just
+        load (i.e. put config vars in fabric.api.env or not)
+    """
+    from fabric.api import env
+
+    if activate:
+        some_env = env
+        some_env.env_active = True
+    else:
+        tmp = env.jinja
+        env.jinja = None
+
+        some_env = copy.deepcopy(env)
+        some_env.env_active = False
+
+        env.jinja = tmp
+
+    some_env.env_name = name
+
+    # Allow user to setup defaults
+    if defaults_func:
+        some_env = defaults_func(some_env, **kwargs)
+    else:
+        some_env = env_defaults(some_env, **kwargs)
+
+    return some_env
+
+
+def env_get(name):
+    """
+    Get environment by name (does not activate the environment).
+
+    An environment is defined in a local task. This task will
+    look for a task with the name <name> and execute. Hence
+    the task defining the environment.
+    """
+    from fabric.api import env
+
+    # Check if active env is requested
+    if env.get('env_active', False) and env.get('env_name', None) == name:
+        return env
+
+    if 'loaded_envs' not in env:
+        env.loaded_envs = {}
+
+    # Check if env is already loaded, if not load it.
+    if name not in env.loaded_envs:
+        res = execute(name, activate=False)
+        env.loaded_envs[name] = res['<local-only>']
+
+    return env.loaded_envs[name]
+
+
+def env_defaults(env, **kwargs):
+    """
+    Setup defaults in environment.
+
+    Note: This can be overridden by the user.
+    """
+    # Initialise template loader
+    env.jinja = Environment(loader=FileSystemLoader([env.env_name, 'common']))
+
+    env.roledefs = {
+        'web': [],
+        'lb': [],
+        'db-master': [],
+        'db-slave': [],
+        'workers': [],
+    }
+
+    env.update({
+        'REQUIREMENTS': ['requirements.txt', 'requirements-extra.txt', ],
+        'WITH_VIRTUALENV': True,
+        'WITH_DEVSERVER': True,
+        'WITH_DEVSCRIPTS': True,
+        'PYTHON': kwargs.get('python', 'python'),
+        'ACTIVATE': '. %(CFG_INVENIO_PREFIX)s/bin/activate',
+
+        'CFG_SRCDIR': '',
+        'CFG_INVENIO_REPOS': [],
+        'CFG_INVENIO_CONF': None,
+        'CFG_INVENIO_SRCDIR': 'invenio',
+        'CFG_INVENIO_PREFIX': '/opt/invenio',
+        'CFG_INVENIO_HOSTNAME': "localhost",
+        'CFG_INVENIO_DOMAINNAME': "",
+        'CFG_INVENIO_PORT_HTTP': "80",
+        'CFG_INVENIO_PORT_HTTPS': "443",
+        'CFG_INVENIO_USER': 'apache',
+        'CFG_INVENIO_APACHECTL': '/etc/init.d/httpd',
+        'CFG_INVENIO_ADMIN': 'root@localhost',
+
+        'CFG_DATABASE_HOST': 'localhost',
+        'CFG_DATABASE_PORT': 3306,
+        'CFG_DATABASE_NAME': 'invenio',
+        'CFG_DATABASE_USER': 'invenio',
+        'CFG_DATABASE_PASS': 'my123p$ss',
+        'CFG_DATABASE_DROP_ALLOWED': False,
+
+        'CFG_MISCUTIL_SMTP_HOST': '',
+        'CFG_MISCUTIL_SMTP_PORT': '',
+    })
+
+    return env
+
+#
+# Helper tasks
+# 
+
 @task
-def install():
-    """
-    Install Invenio and configure installation from scratch
-    """
-    _run_task_group('install')
+def invenio(ref):
+    """ Specify a specific Invenio version """
+    from fabric.api import env
+
+    # Don't mess with local source code.
+    env.CFG_SRCDIR = os.path.expanduser("~/tmp/src/")
+
+    # Set default ref
+    i = -1
+    for j, repo in enumerate(env.CFG_INVENIO_REPOS):
+        if repo[0] == 'invenio':
+            i = j
+            break
+
+    if i != -1:
+        env.CFG_INVENIO_REPOS[i][1]['ref'] = ref
+        print ref
+        if ref in ['v0.99.0', 'v0.99.5']:
+            env.CFG_INVENIO_REPOS[i][1]['bootstrap_targets'] = ['all', 'install', ]
+
+    # Set prefx
+    suffix = _ref2suffix(ref)
+    db_suffix = _ref2dbsuffix(ref)
+
+    env.CFG_INVENIO_PREFIX = "%s-%s" % (env.CFG_INVENIO_PREFIX, suffix)
+
+    # DB prefix
+    env.CFG_DATABASE_DUMPDIR = env.CFG_INVENIO_PREFIX
+    env.CFG_DATABASE_NAME = _shorten_mysqlname('%s_%s' % (env.CFG_DATABASE_NAME, db_suffix))
+    env.CFG_DATABASE_USER = _shorten_mysqlname('%s_%s' % (env.CFG_DATABASE_USER, db_suffix))
+    env.CFG_DATABASE_PASS = _shorten_mysqlname('%s_%s' % (env.CFG_DATABASE_PASS, db_suffix))
+
+#
+# Helpers
+#
+
+def _ref2suffix(ref):
+    refs = ref.split("/")
+    val = refs[-1]
+    return val
 
 
-@task
-def clean():
-    """
-    Clean existing Invenio installation
-    """
-    _run_task_group('clean')
+def _ref2dbsuffix(ref):
+    val = _ref2suffix(ref)
+    return val.replace("-", "_").replace(".", "")
 
 
-@task
-def deploy():
-    """
-    Deploy Invenio from latest master 
-    """
-    _run_task_group('deploy')
-
-
-@task
-def bootstrap():
-    """
-    Bootstrap host system(s) 
-    """
-    _run_task_group('bootstrap')
-
-
-@task
-def copy(from_env):
-    """
-    Copy data from one environment to another  
-    """
-    env_load(from_env)
-    env_settings('copy')['from_env'] = from_env
-    _run_task_group('copy')
-
-
-def _run_task_group(task_name, *args, **kwargs):
-    """
-    Helper function to run a task group
-    """
-    try:
-        for task in env_settings('tasks')[task_name]:
-            if not callable(task):
-                task = state.commands[task]
-            execute(task, *args, **kwargs)
-    except AttributeError:
-        abort("No %s tasks defined." % task_name)
-    except KeyError:
-        abort("Subtask %s not found." % task)
-
-
-def _copy_not_supported(from_env):
-    """
-    By default, copying an environment is not supported
-    """
-    current_env = env_active()
-    abort("Copying %s to %s is not supported." % (from_env, current_env))
-
-
-# =======================
-# Default Fabric settings
-# =======================
-def env_init(name):
-    """
-    Initialize a new environment with default settings.
-    
-    ENV_SETTINGS is a dictionary of settings that is initialized by
-    an environment. The settings are used to configure the tasks
-    for each specific environment (e.g. which conf file to use,
-    database name, bibsched tasks etc). Following is a short reference
-    of settings:
-    
-      * localconf: Local path to an invenio-local.conf for env.
-      * crontab: Local path to a crontab file for env.
-      * schedule: A list of string commands used to set the 
-      * db:
-      * dbdump_dir:    
-    """
-    if not hasattr(env, 'ENVIRONMENTS'):
-        env.ENVIRONMENTS = {
-            'defs' : {},
-            'active' : None,
-        }
-
-    if name not in env.ENVIRONMENTS:
-        env.ENVIRONMENTS['defs'][name] = {
-            'roledefs' : {
-                'web' : [],
-                'db' : [],
-                'backend' : [],
-            },
-            'settings' : {
-                'tasks' : {
-                    'bootstrap' : ['selinux_prepare', 'mysql_prepare', 'apache_prepare'],
-                    'install' : ['mysql_createdb', 'python_prepare', 'apache_configure', 'invenio_install', 'invenio_configure', 'libreoffice_prepare', 'apache_restart', 'crontab_install'],
-                    'deploy' : ['invenio_deploy', 'apache_restart'],
-                    'clean' : ['crontab_uninstall', 'bibsched_halt', 'apache_clean', 'apache_restart', 'python_clean', 'mysql_dropdb', 'invenio_clean', ],
-                    'copy' : [_copy_not_supported],
-                },
-                'bibsched' : {
-                    'schedule' : [
-                        "bibindex -f50000 -s5m -u admin",
-                        "bibrank -f50000 -s5m -u admin",
-                        "bibreformat -oHB -s5m -u admin",
-                        "webcoll -v0 -s5m -u admin",
-                        "bibsort -s5m -u admin",
-                        "bibrank -f50000 -R -wwrd -s14d -LSunday -u admin",
-                        "bibsort -R -s7d -L 'Sunday 01:00-05:00' -u admin",
-                        "inveniogc -a -s7d -L 'Sunday 01:00-05:00' -u admin",
-                        "batchuploader --documents -s20m -u admin",
-                        "batchuploader --metadata -s20m -u admin",
-                        "dbdump -s 20h -L '22:00-06:00' -n 10 -u admin",
-                        "oairepositoryupdater -s1h -u admin",
-                        "oaiharvest -s 24h  -u admin",
-                    ]
-                },
-                'copy' : {
-                    'from_env' : None,
-                },
-                'invenio' : {
-                    'repository' : 'http://invenio-software.org/repo/invenio',
-                    'source_dir' : None,
-                    'host' : None,
-                    'conffile' : '%s.conf' % name,
-                    'admin ' : None,
-                },
-                'mysql' : {
-                    'db' : { 'name' : 'invenio', },
-                    'dbdump_dir' : None,
-                },
-                'system' : {
-                    'crontab' : None,
-                },
-            },
-        }
-    return (env.ENVIRONMENTS['defs'][name]['roledefs'], env.ENVIRONMENTS['defs'][name]['settings'])
-
-
-def env_setactive(name):
-    """
-    Activate an environment (so env_settings will return values from this env).
-    
-    If name is None, the current active environment will be deactivated.
-    """
-    try:
-        if name:
-            env.roledefs = env.ENVIRONMENTS['defs'][name]['roledefs']
-            env.ENV_SETTINGS = env.ENVIRONMENTS['defs'][name]['settings']
-            env.ENVIRONMENTS['active'] = name
-        else:
-            env.roledefs = {}
-            env.ENV_SETTINGS = {}
-            env.ENVIRONMENTS['active'] = None
-    except KeyError:
-        abort("Cannot activate environment %s - it is not defined." % name)
-
-
-def env_active():
-    """
-    Get name of the active environment
-    """
-    try:
-        return env.ENVIRONMENTS['active']
-    except AttributeError:
-        return None
-
-def env_loaded(name):
-    """
-    Determine if an environment has been loaded.
-    """
-    try:
-        return name in env.ENVIRONMENTS['defs']
-    except (KeyError, AttributeError):
-        return False
-
-
-def env_load(name):
-    """
-    Load an environment without activating it.
-    
-    Only environments without any parameters can be loaded.
-    """
-    if not env_loaded(name):
-        if name not in state.commands:
-            abort("Environment %s not found" % name)
-
-        # Get the current active environment
-        current_env = env_active()
-
-        env_load_func = state.commands[name]
-        env_load_func()
-
-        # Reactivate current environment
-        env_setactive(current_env)
-
-
-def env_settings(module, envname=None):
-    """
-    Get settings for a particular module.
-    
-    Example (get 'conffile' setting for 'invenio' module)::
-    
-      conffile = env_settings('invenio')['conffile']
-    """
-    try:
-        if not envname:
-            return env.ENV_SETTINGS[module]
-        else:
-            if envname not in env.ENVIRONMENTS['defs']:
-                env_load(envname)
-            return env.ENVIRONMENTS['defs'][envname]['settings'][module]
-    except KeyError:
-        if envname:
-            abort("Misconfiguration - module %s or environment %s not found." % (module, envname))
-        else:
-            abort("Misconfiguration - module %s not found." % module)
-    except AttributeError:
-        abort("No environment loaded.")
-
-
-def env_settings_ctx(envname=None):
-    """
-    Get all settings as a context usable for  a Jinja template
-    """
-    try:
-        if not envname:
-            return env.ENV_SETTINGS
-        else:
-            if envname not in env.ENVIRONMENTS['defs']:
-                env_load(envname)
-            return env.ENVIRONMENTS['defs'][envname]['settings']
-    except KeyError:
-        abort("Misconfiguration - environment %s not found." % envname)
-    except AttributeError:
-        abort("No environment loaded.")
-
-
+def _shorten_mysqlname(name):
+    if len(name) > 16:
+        name = name.replace("_", "", len(name) - 16)
+        return name[:16]
+    return name

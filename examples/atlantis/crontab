@@ -1,5 +1,0 @@
-#
-# This crontab should be installed for the Apache user.
-#
-# invenio: run alert engine:
-30 14 * * * /opt/invenio/bin/alertengine

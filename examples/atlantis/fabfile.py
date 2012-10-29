@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-# A Fabric file for installing, deploying and running Invenio on CERN 
-# hosts running SLC5.
-#
-# Lars Holm Nielsen <lars.holm.nielsen@cern.ch>
-#
-# Copyright (C) 2012 CERN.
-#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -21,43 +14,117 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 """
-Fabric tasks for bootstrapping, installing and deploying Invenio demo site on 
-CERN Scientific Linux 5/6 hosts.
+Fabric tasks for bootstrapping, installing, deploying and running Atlantis.
 
-The tasks follow the guidelines on installing Invenio on SLC5:
+Examples
+--------
 
-  * http://invenio-software.org/wiki/Installation/InvenioOnSLC5
+Setup virtual environment and database with Python 2.4 and Invenio 1.0.0:
+  fab loc:py=2.4,ref=master bootstrap
+  fab loc:py=2.4,ref=master invenio_create_demosite
 
-Example usage:
-
-  fab -u <user> env_atlantis:<host> bootstrap
-  fab -u <user> env_atlantis:<host> install
-  fab -u <user> env_atlantis:<host> deploy
-  fab -u <user> env_atlantis:<host> clean
+Dump (database and virtual environment), load and drop:
+  fab loc:py=2.4,ref=master dump
+  fab loc:py=2.4,ref=master load
+  fab loc:py=2.4,ref=master drop
 """
 
-from fabric.api import task
+from fabric.api import task, abort
+from fabric.colors import red
 from inveniofab.api import *
-from inveniofab.env import env_init, env_activate
+import os
+
+PYTHON_VERSIONS = {
+    '2.7' : os.path.expanduser('~/.pythonbrew/pythons/Python-2.7.3/bin/python'),
+    '2.6' : os.path.expanduser('~/.pythonbrew/pythons/Python-2.6.7/bin/python'),
+    '2.5' : os.path.expanduser('~/.pythonbrew/pythons/Python-2.5.4/bin/python'),
+    '2.4' : os.path.expanduser('~/.pythonbrew/pythons/Python-2.4.6/bin/python'),
+}
+
+REFS = {
+    'jkuncar-public/flask' : {
+        'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', 'install-jquery-tokeninput', 'install-bootstrap' ],
+        'deploy_targets': ['all', 'check-upgrade', 'install', ],
+        'requirements' : ['%(CFG_INVENIO_SRCDIR)s/requirements.txt', '%(CFG_INVENIO_SRCDIR)s/requirements-extras.txt', '%(CFG_INVENIO_SRCDIR)s/requirements-flask.txt', '%(CFG_INVENIO_SRCDIR)s/requirements-flask-ext.txt',],
+    },
+    'origin/v0.99.0' : {
+        'bootstrap_targets' : ['all', 'install'],
+        'deploy_targets' : ['all', 'install'],
+    },
+    'origin/v0.99.5' : {
+        'bootstrap_targets' : ['all', 'install'],
+        'deploy_targets' : ['all', 'install'],
+    },
+}
+
+APACHECTL = 'service apache2'
 
 @task
-def env_atlantis(host):
+def loc(activate=True, py=None, ref=None, **kwargs):
     """
-    Defines OpenAIRE production environment
+    Local environment (example: loc:py=2.4,ref=maint-1.1)
     """
-    # Initialize environment namespace
-    roledefs, envsettings = env_init('env_atlantis')
-    
-    # Update the role definitions
-    roledefs.update({
-        'web' : [host, ],
-        'db' : [host, ],
-        'backend' : [host, ],
-    })
-    
-    # Update environment settings - see inveniofab.env.env_init for all
-    # available settings.
-    envsettings['invenio']['conffile'] = 'atlantis.conf'
-    envsettings['system']['crontab'] = 'crontab'
-    
-    env_activate('env_atlantis')
+    if py is None:
+        kwargs['python'] = 'python'
+    elif py in PYTHON_VERSIONS:
+        kwargs['python'] = PYTHON_VERSIONS[py]
+    else:
+        abort(red("Unknown Python version %s" % py))
+
+    name = make_name(py or '', ref or '')
+    prefix = os.path.join(os.getenv('WORKON_HOME', '~/envs'), name)
+
+    env = env_create('loc', activate=activate, **kwargs)
+    env.CFG_SRCDIR = os.path.expanduser(os.environ.get("CFG_SRCDIR", "~/src/"))
+
+    env.CFG_INVENIO_SRCDIR = os.path.join(env.CFG_SRCDIR, 'invenio')
+    env.CFG_INVENIO_PREFIX = prefix
+    env.CFG_INVENIO_PORT_HTTP = "4000"
+    env.CFG_INVENIO_PORT_HTTPS = "4000"
+    env.CFG_INVENIO_USER = env.user
+    env.CFG_INVENIO_APACHECTL = APACHECTL
+    env.CFG_INVENIO_ADMIN = 'nobody@localhost'
+
+    env.CFG_INVENIO_REPOS = [
+        ('invenio', {
+            'repository' : 'http://invenio-software.org/repo/invenio/',
+            'ref': 'origin/maint-1.1',
+            'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', ],
+            'deploy_targets': ['all', 'check-upgrade', 'install', ],
+        }),
+    ]
+
+    env.CFG_DATABASE_DUMPDIR = prefix
+    env.CFG_DATABASE_HOST = 'localhost'
+    env.CFG_DATABASE_NAME = name
+    env.CFG_DATABASE_USER = name
+    env.CFG_DATABASE_PASS = name
+    env.CFG_DATABASE_DROP_ALLOWED = True
+
+    env.CFG_MISCUTIL_SMTP_HOST = '127.0.0.1'
+    env.CFG_MISCUTIL_SMTP_PORT = '1025'
+
+    # Override make targets and requirements for specific branches
+    if ref in REFS:
+        env.CFG_INVENIO_REPOS[0][1]['ref'] = ref
+        if 'bootstrap_targets' in REFS[ref]:
+            env.CFG_INVENIO_REPOS[0][1]['bootstrap_targets'] = REFS[ref]['bootstrap_targets']
+        if 'deploy_targets' in REFS[ref]:
+            env.CFG_INVENIO_REPOS[0][1]['deploy_targets'] = REFS[ref]['deploy_targets']
+        if 'requirements' in REFS[ref]:
+            env.REQUIREMENTS = REFS[ref]['requirements']
+
+#
+# Helpers
+#
+def make_name(python, ref):
+    ref = ref.split("/")
+    ref = ref[-1]
+    python = python.replace(".","")
+
+    name = "atlantis%s%s" % (python, ref)
+    if len(name) > 16:
+        name = name.replace("_", "", len(name) - 16)
+        return name[:16]
+
+    return name

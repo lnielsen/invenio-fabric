@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-# A Fabric file for installing, deploying and running Invenio on CERN 
-# SLC5/6 hosts.
-#
-# Lars Holm Nielsen <lars.holm.nielsen@cern.ch>
-#
 # Copyright (C) 2012 CERN.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -20,102 +15,88 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
-"""
-Utility and helper functions. Functions in this module are not 
-meant as standalone Fabric tasks, but for usage in other library
-tasks. 
-"""
-
-from fabric.api import env, run, sudo, abort, cd
-from fabric.contrib.files import exists
-from jinja2 import Environment, FileSystemLoader
+from fabric.api import prompt, env, local
+import getpass
 import os
-import re
-import tempfile
+from jinja2 import Environment, FileSystemLoader
+from jinja2.exceptions import TemplateNotFound
 
-def source_checkout(path, repo=None, source_dir=None, use_sudo=False):
+def prompt_and_check(questions, check_func, stored_answers=None):
     """
-    Helper function to checkout repository or symlink source directory.
+    Ask user for questions, and check answers with supplied function
     """
-    parent, base = os.path.split(path)
+    done = False
 
-    _run_func = sudo if use_sudo else run
+    if stored_answers:
+        if check_func(stored_answers):
+            answers = stored_answers
+            done = True
 
-    if exists(path):
-        # Path already exists os assume it's the right one.
-        return 
-    elif not exists(parent):
-        abort("Path %s does not exists." % parent)
+    while not done:
+        answers = {}
+        for q, key in questions:
+            if 'password' in key:
+                answers[key] = getpass.getpass(q + " ")
+            else:
+                answers[key] = prompt(q)
+        if check_func(answers):
+            done = True
+    return answers
 
-    with cd(parent):
-        if repo:
-            _run_func("git clone %s %s" % (repo, base))
-        elif source_dir:
-            _run_func("ln -s %s %s" % (source_dir, path))
+
+def write_template(filename, context, tpl_str=None, tpl_file=None, append=False, mark=None):
+    """
+    Render template and write output to file
+
+    @param filename: File to write
+    @param template: Name of template
+    @param context: Dictionary for the template context (usually just env)
+    @param append: bool, True if you want to append content to file instead of overwriting.
+    @param mark: str, If append is true and mark is defined, then the rendered
+                 template will replace any previous appened version.
+    """
+    if tpl_file:
+        try:
+            tpl = env.jinja.get_template(tpl_file)
+        except TemplateNotFound, e:
+            jinja = Environment(loader=FileSystemLoader([os.path.dirname(tpl_file)]))
+            tpl = jinja.get_template(os.path.basename(tpl_file))
+    elif tpl_str:
+        tpl = env.jinja.from_string(tpl_str)
+    content = tpl.render(context)
+    if append and mark is not None:
+        start_mark = "### START: %s ###" % mark
+        end_mark = "### END: %s ###" % mark
+        marked_content = """%s\n%s\n%s\n""" % (start_mark, content, end_mark)
+
+        file_content = []
+        skip = False
+        added = False
+
+        f = open(filename, 'r')
+        for line in f:
+            if line == start_mark:
+                skip = True
+                added = True
+                file_content.append(marked_content)
+            elif line == end_mark:
+                skip = False
+            else:
+                if not skip:
+                    file_content.append(line)
+        f.close()
+
+        if added:
+            append = False
+            content = "\n".join(file_content)
         else:
-            abort("Please provide either a repository or a source directory.")
+            content = marked_content
+
+    f = open(filename, 'a' if append else 'w')
+    f.write(content.encode('utf8'))
+    f.close()
 
 
-def source_update(path, repo=None, source_dir=None, use_sudo=False):
-    """
-    Helper function to update source in a repository or source dir.
-    """
-    _run_func = sudo if use_sudo else run
-
-    with cd(path):
-        if repo:
-            _run_func("git pull")
-        elif source_dir:
-            # Source dir is assumed to be updated outside of this task
-            # e.g via untar, directly editing etc. 
-            pass
-
-
-def source_clean(path, repo=None, source_dir=None, use_sudo=False):
-    """
-    Helper function to remove checked out source code
-    """
-    parent, base = os.path.split(path)
-
-    _run_func = sudo if use_sudo else run
-
-    with cd(parent):
-        if repo:
-            _run_func("rm -Rf %s" % base)
-        elif source_dir:
-            # Symlinked directory
-            _run_func("rm -f %s" % base)
-
-
-def slc_version():
-    """
-    Determine Scientific Linux CERN version 
-    """
-    if not hasattr(env, 'SLC_VERSION'):
-        osver = run("cat /etc/redhat-release")
-        m = re.match("Scientific Linux CERN SLC release ([0-9])\.([0-9]) \([A-Za-z-_ ]+\)", osver)
-        if m:
-            env.SLC_VERSION = (int(m.group(1)), int(m.group(2)))
-        else:
-            env.SLC_VERSION = (int(m.group(1)), int(m.group(2)))
-    return env.SLC_VERSION
-
-
-def render_file_template( filename, context ):
-    """
-    Render a template and save it in a temporary file which
-    can e.g. be uploaded to a remote host.
-    """
-    jenv = Environment(loader=FileSystemLoader('.'))
-    text = jenv.get_template(filename).render(**context or {})
-    
-    hdl, tempfilename = tempfile.mkstemp(text=True)
-    
-    with open(tempfilename, 'w') as f:
-        f.write(text.encode('utf8'))
-    
-    return tempfilename
-
-
-
-    
+def python_version():
+    """ Determine Python version """
+    return local(("%(CFG_INVENIO_PREFIX)s/bin/python -c \"import sys;print str(sys.version_info[0]) + '.' + str(sys.version_info[1])\"") % env, capture=True)

@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-# A Fabric file for installing, deploying and running Invenio on CERN 
-# SLC5/6 hosts.
-#
-# Lars Holm Nielsen <lars.holm.nielsen@cern.ch>
-#
 # Copyright (C) 2012 CERN.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -21,22 +16,23 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 """
-Definition of Invenio Fabric API. To make all the library tasks available 
+Definition of Invenio Fabric API. To make all the library tasks available
 in a fabfile.py you just have to have the following import in the top
 of your file::
 
   from inveniofab.api import *
 """
 
-from inveniofab.apache import apache_clean, apache_configure, apache_prepare, \
-    apache_restart
-from inveniofab.bibsched import bibsched_halt, bibsched_schedule, bibsched_start, \
-    bibsched_status, bibsched_stop, bibsched_clear_schedule
-from inveniofab.env import bootstrap, clean, deploy, install, copy
-from inveniofab.invenio import invenio_clean, invenio_configure, invenio_deploy, \
-    invenio_install, invenio_updateconf, invenio_reset_adminpw, invenio_fix_filelinks
-from inveniofab.mysql import mysql_prepare, mysql_loaddump, mysql_dropdb, \
-    mysql_createdb, mysql_copy
-from inveniofab.python import python_clean, python_prepare
-from inveniofab.system import crontab_install, crontab_show, crontab_uninstall, \
-    libreoffice_prepare, selinux_prepare, copy_files
+from inveniofab.apache import apache_start, apache_restart, apache_stop
+from inveniofab.env import env_defaults, env_get, env_create
+from inveniofab.git import repo_update, repo_setup, repo_prepare, \
+    repo_install, repo_make, repo_configure
+from inveniofab.invenio import invenio_conf, invenio_create_demosite, \
+    invenio_createdb, invenio_upgrade
+from inveniofab.mysql import mysql_dropdb, mysql_createdb, mysql_load, \
+    mysql_dump, mysql_copy
+from inveniofab.test import test_load, test_dump, test_clean, test_reset_admin
+from inveniofab.venv import venv_create, venv_dump, venv_load, venv_drop, \
+    venv_requirements
+from inveniofab.compound import bootstrap, install, dump, load, drop
+from inveniofab.devserver import devserver_conf, devserver_install_flask

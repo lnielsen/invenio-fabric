@@ -1,1 +1,7 @@
-Lars Holm Nielsen <lars.holm.nielsen@cern.ch>
+Invenio Fabric AUTHORS
+======================
+
+ * Lars Holm Nielsen <lars.holm.nielsen@cern.ch>
+
+# Run:
+# git log | grep "^Author:" | sort | uniq | sed s/Author:\ //

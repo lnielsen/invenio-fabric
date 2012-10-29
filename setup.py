@@ -30,12 +30,12 @@ setup(
     package_dir={'': 'src'},
     include_package_data=False,
     zip_safe=False,
-    install_requires=['distribute', 'Fabric>=1.4','Jinja2' ],
+    install_requires=['distribute', 'Fabric>=1.4', 'Jinja2' ],
 
     author='Lars Holm Nielsen',
     author_email='lars.holm.nielsen@cern.ch',
-    description='Fabric tasks for installing, deploying and running Invenio on CERN SLC5/6 hosts.',
+    description='Fabric tasks for working with Invenio repository software',
     license="GPL",
-    keywords="invenio fabric cern",
-    url="https://github.com/lnielsen-cern/invenio-fabric"
+    keywords="invenio fabric CERN",
+    url="https://github.com/lnielsen-cern/invenio-fabric",
 )

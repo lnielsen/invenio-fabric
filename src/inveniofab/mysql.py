@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-# A Fabric file for installing, deploying and running Invenio on CERN 
-# SLC5/6 hosts.
-#
-# Lars Holm Nielsen <lars.holm.nielsen@cern.ch>
-#
 # Copyright (C) 2012 CERN.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -24,111 +19,236 @@
 Library tasks for configuring and running MySQL for Invenio.
 """
 
-from fabric.api import roles, sudo, env, prompt, run, abort, task, settings
+from fabric.api import puts, task, env, local, abort, settings, hide
+from fabric.colors import red, cyan
 from fabric.contrib.console import confirm
-from fabric.contrib.files import exists
-from inveniofab.env import env_settings, env_load
+from inveniofab.env import env_get
+from inveniofab.utils import prompt_and_check
+import os
 
-@roles('db')
 @task
-def mysql_prepare():
+def mysql_dropdb(stored_answers=None):
     """
-    Prepare MySQL on SLC5 host
+    Drop database and user
     """
-    sudo("/sbin/service mysqld start")
-    sudo("/sbin/chkconfig mysqld on")
-        
-    if confirm("Secure MySQL installation?"):
-        sudo("/usr/bin/mysql_secure_installation")
-        
-    # Create DB dump dir
-    dumpdir = env_settings('mysql')['dbdump_dir'] or '/opt/invenio/var/log/'
-    if dumpdir:
-        sudo("mkdir -p %s" % dumpdir, user="apache")
-        sudo("chown apache:apache %s" % dumpdir, user="apache")
-        sudo("chmod 755 %s" % dumpdir, user="apache")
+    puts(cyan(">>> Dropping database and user ..." % env))
+
+    answers = prompt_and_check([
+        ("MySQL admin user:", "user"),
+        ("MySQL admin password:", "password")
+    ], mysql_admin_check(env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT), stored_answers=stored_answers)
+
+    user_pw = '-u %(user)s --password=%(password)s' % answers if answers['password'] else '-u %(user)s' % answers
+
+    ctx = {
+        'user_pw': user_pw,
+        'host': env.CFG_DATABASE_HOST,
+        'name' :  env.CFG_DATABASE_NAME,
+        'user' :  env.CFG_DATABASE_USER,
+        'password' : env.CFG_DATABASE_PASS,
+        'port': env.CFG_DATABASE_PORT,
+    }
+
+    local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "DROP DATABASE IF EXISTS %(name)s"' % ctx)
+    with settings(warn_only=True):
+        local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "REVOKE ALL PRIVILEGES ON %(name)s.* FROM %(user)s@localhost"' % ctx)
+    local('mysqladmin %(user_pw)s -h %(host)s -P %(port)s flush-privileges' % ctx)
 
 
-@roles('db')
 @task
-def mysql_createdb():
+def mysql_createdb(stored_answers=None):
     """
-    Create database and user for Invenio
+    Create database and user
     """
-    # Create context
-    ctx = env_settings('mysql')['db']
-    if 'user' not in ctx:
-        ctx['user'] = ctx['name']
-    if 'password' not in ctx:
-        newpw = prompt('Enter new MySQL Invenio user password (typing will be visible, default is my123p$ss):')
-        ctx['password'] = "my123p$ss" if not newpw else newpw
+    puts(cyan(">>> Creating database and user ..." % env))
+
+    answers = prompt_and_check([
+        ("MySQL admin user:", "user"),
+        ("MySQL admin password:", "password")
+    ], mysql_admin_check(env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT), stored_answers=stored_answers)
+
+    user_pw = '-u %(user)s --password=%(password)s' % answers if answers['password'] else '-u %(user)s' % answers
+
+    ctx = {
+        'user_pw': user_pw,
+        'host' :  env.CFG_DATABASE_HOST,
+        'name' :  env.CFG_DATABASE_NAME,
+        'user' :  env.CFG_DATABASE_USER,
+        'password' : env.CFG_DATABASE_PASS,
+        'port': env.CFG_DATABASE_PORT,
+    }
 
     # Escape quote characters
-    ctx['password'] = ctx['password'].replace("'","\'").replace('"','\"').replace('$','\\$')
+    ctx['password'] = ctx['password'].replace("'", "\'").replace('"', '\"').replace('$', '\\$')
 
     # Run commands
-    run('mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS %(name)s DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci"' % ctx)
-    run('mysql -u root -p -e "GRANT ALL PRIVILEGES ON %(name)s.* TO %(user)s@localhost IDENTIFIED BY \'%(password)s\';"' % ctx, shell=False)
-    run('mysqladmin -u root -p flush-privileges')
+    local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "CREATE DATABASE IF NOT EXISTS %(name)s DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci"' % ctx)
+    local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "GRANT ALL PRIVILEGES ON %(name)s.* TO %(user)s@localhost IDENTIFIED BY \'%(password)s\';"' % ctx)
+    local('mysqladmin %(user_pw)s -h %(host)s -P %(port)s flush-privileges' % ctx)
 
 
-@roles('db')
 @task
-def mysql_dropdb():
+def mysql_dump(outputdir=None):
     """
-    Create database and user for Invenio
+    Dump database to file
     """
-    # Create context
-    ctx = env_settings('mysql')['db']
-    if 'user' not in ctx:
-        ctx['user'] = ctx['name']
-    
+    puts(cyan(">>> Dumping database ..." % env))
+
+    answers = {
+        'user' : env.CFG_DATABASE_USER,
+        'password' : env.CFG_DATABASE_PASS,
+    }
+
+    if not outputdir:
+        outputdir = env.CFG_DATABASE_DUMPDIR
+
+    if not os.path.exists(outputdir):
+        abort(red("Output directory %s does not exists" % outputdir))
+
+    user_pw = '-u %(user)s --password=%(password)s' % answers if answers['password'] else '-u %(user)s' % answers
+    outfile = os.path.join(outputdir, "%s.sql" % env.CFG_DATABASE_NAME)
+    outfile_gz = "%s.gz" % outfile
+
+    for f in [outfile, outfile_gz]:
+        if os.path.exists(f):
+            res = confirm("Remove existing DB dump in %s ?" % f)
+            if not res:
+                abort(red("Cannot continue") % env)
+            else:
+                local("rm -Rf %s" % f)
+
+    ctx = {
+        'user_pw': user_pw,
+        'host' :  env.CFG_DATABASE_HOST,
+        'name' :  env.CFG_DATABASE_NAME,
+        'port': env.CFG_DATABASE_PORT,
+        'outfile_gz': outfile_gz,
+        'outfile': outfile,
+    }
+
     # Run commands
-    with settings(warn_only = True):
-        run('mysql -u root -p -e "DROP DATABASE IF EXISTS %(name)s"' % ctx)
-        run('mysql -u root -p -e "REVOKE ALL PRIVILEGES ON %(name)s.* FROM %(user)s@localhost"' % ctx)
-        run('mysqladmin -u root -p flush-privileges')
+    local('mysqldump %(user_pw)s -h %(host)s -P %(port)s --skip-opt '
+          '--add-drop-table --add-locks --create-options --quick '
+          '--extended-insert --set-charset --disable-keys %(name)s '
+          '| gzip -c > %(outfile_gz)s' % ctx)
 
 
-@roles('db')
 @task
-def mysql_loaddump( dumpfile ):
+def mysql_load(dumpfile=None, stored_answers=None):
     """
     Load MySQL dump file
     """
-    if not exists(dumpfile, use_sudo = True):
+    puts(cyan(">>> Loading database dump..."))
+
+    if not dumpfile:
+        dumpfile = os.path.join(env.CFG_DATABASE_DUMPDIR, "%s.sql.gz" % env.CFG_DATABASE_NAME)
+
+    if not os.path.exists(dumpfile):
         abort("File %s does not exists." % dumpfile)
-    
-    if confirm("This will erease all data in the existing database. Are you sure you want to load %s?" % dumpfile):
-        ctx = env_settings('mysql')['db']
-        ctx['dumpfile'] = dumpfile
-        run('mysql -u root -p -e "DROP DATABASE IF EXISTS %(name)s"' % ctx)
-        run('mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS %(name)s DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci"' % ctx)
-        run('mysql -u root -f -p %(name)s < %(dumpfile)s' % ctx)
-        
-        
-@roles('db')
+
+    answers = prompt_and_check([
+        ("MySQL admin user:", "user"),
+        ("MySQL admin password:", "password")
+    ], mysql_admin_check(env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT), stored_answers)
+
+    user_pw = '-u %(user)s --password=%(password)s' % answers if answers['password'] else '-u %(user)s' % answers
+
+    if dumpfile.endswith(".gz"):
+        dumpfile_stream = "gunzip -c %s" % dumpfile
+    else:
+        dumpfile_stream = "cat %s" % dumpfile
+
+    ctx = {
+        'user_pw': user_pw,
+        'host' :  env.CFG_DATABASE_HOST,
+        'name' :  env.CFG_DATABASE_NAME,
+        'user' :  env.CFG_DATABASE_USER,
+        'password' : env.CFG_DATABASE_PASS,
+        'port': env.CFG_DATABASE_PORT,
+        'dumpfile': dumpfile,
+        'dumpfile_stream': dumpfile_stream,
+    }
+
+    if confirm("This will erease all data in the existing database. Are you sure you want to load %(dumpfile)s?" % ctx):
+        mysql_dropdb(stored_answers=answers)
+        mysql_createdb(stored_answers=answers)
+
+        local('%(dumpfile_stream)s | mysql %(user_pw)s -h %(host)s -P %(port)s -f %(name)s' % ctx)
+
+    return dumpfile
+
+
 @task
-def mysql_copy( from_env ):
+def mysql_copy(from_env):
     """
-    Copy database from an environment using the latest available dump.
-    
+    Copy database from latest available dump.
+
     Currently it is assumed that the dump file is accessible on the
     same path on both environment host systems. This usually means that
-    the dumps are stored on a shared network storage. 
+    the dumps are stored on a shared network storage.
     """
-    env_load( from_env )
-    
-    from_dbdump_dir = env_settings('mysql', envname = from_env)['dbdump_dir']
-    
-    if not from_dbdump_dir:
-        abort("Database dump directory not specified in %s" % from_env)
-    
-    # Find latest database dump.
-    try:
-        tmp = run('ls -1t %s*.sql' % from_dbdump_dir)
-        latest_dumpfile = tmp.splitlines()[0]
-    except Exception:
-        abort("Could not find latest dump file")
-        
-    mysql_loaddump(latest_dumpfile)
+    to_env = env
+    from_env = env_get(from_env)
+
+    answers_from = prompt_and_check([
+        ("FROM MySQL admin user:", "user"),
+        ("FROM MySQL admin password:", "password")
+    ], mysql_admin_check(from_env.CFG_DATABASE_HOST, from_env.CFG_DATABASE_PORT))
+
+    answers_to = prompt_and_check([
+        ("TO MySQL admin user:", "user"),
+        ("TO MySQL admin password:", "password")
+    ], mysql_admin_check(to_env.CFG_DATABASE_HOST, to_env.CFG_DATABASE_PORT))
+
+
+    user_pw_from = '-u %(user)s --password=%(password)s' % answers_from if answers_from['password'] else '-u %(user)s' % answers_from
+    user_pw_to = '-u %(user)s --password=%(password)s' % answers_to if answers_to['password'] else '-u %(user)s' % answers_to
+
+    ctx = {
+        'user_pw_from': user_pw_from,
+        'user_pw_to': user_pw_to,
+        'from_host' :  from_env.CFG_DATABASE_HOST,
+        'from_name' :  from_env.CFG_DATABASE_NAME,
+        'from_user' :  from_env.CFG_DATABASE_USER,
+        'from_password' : from_env.CFG_DATABASE_PASS,
+        'from_port': from_env.CFG_DATABASE_PORT,
+        'to_host' :  to_env.CFG_DATABASE_HOST,
+        'to_name' :  to_env.CFG_DATABASE_NAME,
+        'to_user' :  to_env.CFG_DATABASE_USER,
+        'to_password' : to_env.CFG_DATABASE_PASS,
+        'to_port': to_env.CFG_DATABASE_PORT,
+    }
+
+
+    puts(">>> You are about to copy:")
+    puts(">>>   %(from_user)s@%(from_host)s:%(from_port)s/%(from_name)s" % ctx)
+    puts(">>> to:")
+    puts(">>>   %(to_user)s@%(to_host)s:%(to_port)s/%(to_name)s" % ctx)
+
+    if confirm("This will erease all data in the latter database and may impact performance on system being copied from. Are you sure you want to proceed?"):
+        mysql_dropdb(stored_answers=answers_to)
+        mysql_createdb(stored_answers=answers_to)
+
+    local('mysqldump %(user_pw_from)s -h %(from_host)s -P %(from_port)s -f %(from_name)s | mysql %(user_pw_to)s -h %(to_host)s -P %(to_port)s -f %(to_name)s' % ctx)
+
+
+#
+# Helpers
+#
+
+def mysql_admin_check(host, port):
+    def _mysql_admin_check(answers):
+        ctx = {'host': host, 'port': port}
+        ctx.update(answers)
+        try:
+            with hide('everything', 'status', 'output', 'commands'):
+                if answers['password']:
+                    res = local("""mysql -u %(user)s --password=%(password)s -h %(host)s -P %(port)s -e 'SELECT 1'""" % ctx)
+                else:
+                    res = local("""mysql -u %(user)s -h %(host)s -P %(port)s -e 'SELECT 1'""" % ctx)
+            return True
+        except SystemExit:
+            puts(red("MySQL admin user/password is not valid. Please try again."))
+            return False
+
+    return _mysql_admin_check

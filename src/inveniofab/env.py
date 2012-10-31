@@ -29,7 +29,7 @@ from jinja2 import Environment, FileSystemLoader
 import copy
 import os
 
-def env_create(name, defaults_func=None, activate=True, **kwargs):
+def env_create(envname, defaults_func=None, activate=True, **kwargs):
     """
     Create a new environment (e.g. integration, production,
     local). Minimal usage::
@@ -41,7 +41,7 @@ def env_create(name, defaults_func=None, activate=True, **kwargs):
           env.CFG_
           return env
 
-    @param name: str, Name of environment (must be same as task name).
+    @param envname: str, Name of environment (must be same as task envname).
     @param defaults_func: callable taking a dictionary as argument and returns
         the same dictionary. Used to setup defaults in the environment.
     @param activate: Bool, True to activate the environment, or False to just
@@ -61,7 +61,7 @@ def env_create(name, defaults_func=None, activate=True, **kwargs):
 
         env.jinja = tmp
 
-    some_env.env_name = name
+    some_env.env_name = envname
 
     # Allow user to setup defaults
     if defaults_func:
@@ -97,7 +97,7 @@ def env_get(name):
     return env.loaded_envs[name]
 
 
-def env_defaults(env, **kwargs):
+def env_defaults(env, name='invenio', prefix=None, **kwargs):
     """
     Setup defaults in environment.
 
@@ -105,6 +105,7 @@ def env_defaults(env, **kwargs):
     """
     # Initialise template loader
     env.jinja = Environment(loader=FileSystemLoader([env.env_name, 'common']))
+    prefix = prefix or os.path.join(os.getenv('WORKON_HOME', '/opt'), name)
 
     env.roledefs = {
         'web': [],
@@ -118,90 +119,48 @@ def env_defaults(env, **kwargs):
         'REQUIREMENTS': ['requirements.txt', 'requirements-extra.txt', ],
         'WITH_VIRTUALENV': True,
         'WITH_DEVSERVER': True,
+        'WITH_WORKDIR': True,
         'WITH_DEVSCRIPTS': True,
         'PYTHON': kwargs.get('python', 'python'),
         'ACTIVATE': '. %(CFG_INVENIO_PREFIX)s/bin/activate',
-
-        'CFG_SRCDIR': '',
         'CFG_INVENIO_REPOS': [],
         'CFG_INVENIO_CONF': None,
-        'CFG_INVENIO_SRCDIR': 'invenio',
-        'CFG_INVENIO_PREFIX': '/opt/invenio',
+        'CFG_INVENIO_SRCDIR': os.path.join(prefix, 'src/invenio'),
+        'CFG_INVENIO_PREFIX': prefix,
+        'CFG_SRCDIR' : os.environ.get('CFG_SRCDIR', os.path.join(prefix, 'src')),
+        'CFG_SRCWORKDIR' : os.path.join(prefix, 'src'),
         'CFG_INVENIO_HOSTNAME': "localhost",
         'CFG_INVENIO_DOMAINNAME': "",
-        'CFG_INVENIO_PORT_HTTP': "80",
-        'CFG_INVENIO_PORT_HTTPS': "443",
-        'CFG_INVENIO_USER': 'apache',
+        'CFG_INVENIO_PORT_HTTP': "4000",
+        'CFG_INVENIO_PORT_HTTPS': "4000",
+        'CFG_INVENIO_USER': env.user,
         'CFG_INVENIO_APACHECTL': '/etc/init.d/httpd',
-        'CFG_INVENIO_ADMIN': 'root@localhost',
+        'CFG_INVENIO_ADMIN': 'nobody@localhost',
 
+        'CFG_DATABASE_DUMPDIR': prefix,
         'CFG_DATABASE_HOST': 'localhost',
         'CFG_DATABASE_PORT': 3306,
-        'CFG_DATABASE_NAME': 'invenio',
-        'CFG_DATABASE_USER': 'invenio',
+        'CFG_DATABASE_NAME': name,
+        'CFG_DATABASE_USER': name,
         'CFG_DATABASE_PASS': 'my123p$ss',
-        'CFG_DATABASE_DROP_ALLOWED': False,
+        'CFG_DATABASE_DROP_ALLOWED': True,
 
-        'CFG_MISCUTIL_SMTP_HOST': '',
-        'CFG_MISCUTIL_SMTP_PORT': '',
+        # FIXME: Set to localhost or leave empty?
+        'CFG_MISCUTIL_SMTP_HOST': '127.0.0.1',
+        'CFG_MISCUTIL_SMTP_PORT': '1025',
     })
+
+    env.CFG_INVENIO_REPOS = [
+        ('invenio', {
+            'repository' : 'http://invenio-software.org/repo/invenio/',
+            'ref': 'origin/master',
+            'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', ],
+            'deploy_targets': ['all', 'check-upgrade', 'install', ],
+        }),
+    ]
 
     return env
 
 #
 # Helper tasks
 # 
-
-@task
-def invenio(ref):
-    """ Specify a specific Invenio version """
-    from fabric.api import env
-
-    # Don't mess with local source code.
-    env.CFG_SRCDIR = os.path.expanduser("~/tmp/src/")
-
-    # Set default ref
-    i = -1
-    for j, repo in enumerate(env.CFG_INVENIO_REPOS):
-        if repo[0] == 'invenio':
-            i = j
-            break
-
-    if i != -1:
-        env.CFG_INVENIO_REPOS[i][1]['ref'] = ref
-        print ref
-        if ref in ['v0.99.0', 'v0.99.5']:
-            env.CFG_INVENIO_REPOS[i][1]['bootstrap_targets'] = ['all', 'install', ]
-
-    # Set prefx
-    suffix = _ref2suffix(ref)
-    db_suffix = _ref2dbsuffix(ref)
-
-    env.CFG_INVENIO_PREFIX = "%s-%s" % (env.CFG_INVENIO_PREFIX, suffix)
-
-    # DB prefix
-    env.CFG_DATABASE_DUMPDIR = env.CFG_INVENIO_PREFIX
-    env.CFG_DATABASE_NAME = _shorten_mysqlname('%s_%s' % (env.CFG_DATABASE_NAME, db_suffix))
-    env.CFG_DATABASE_USER = _shorten_mysqlname('%s_%s' % (env.CFG_DATABASE_USER, db_suffix))
-    env.CFG_DATABASE_PASS = _shorten_mysqlname('%s_%s' % (env.CFG_DATABASE_PASS, db_suffix))
-
-#
-# Helpers
-#
-
-def _ref2suffix(ref):
-    refs = ref.split("/")
-    val = refs[-1]
-    return val
-
-
-def _ref2dbsuffix(ref):
-    val = _ref2suffix(ref)
-    return val.replace("-", "_").replace(".", "")
-
-
-def _shorten_mysqlname(name):
-    if len(name) > 16:
-        name = name.replace("_", "", len(name) - 16)
-        return name[:16]
-    return name

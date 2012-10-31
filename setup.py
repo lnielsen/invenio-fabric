@@ -30,7 +30,7 @@ setup(
     package_dir={'': 'src'},
     include_package_data=False,
     zip_safe=False,
-    install_requires=['distribute', 'Fabric>=1.4', 'Jinja2' ],
+    install_requires=['distribute', 'Fabric>=1.4', 'Jinja2', 'virtualenvwrapper'],
 
     author='Lars Holm Nielsen',
     author_email='lars.holm.nielsen@cern.ch',

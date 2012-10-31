@@ -145,6 +145,11 @@ def venv_create():
         puts(">>> Installing invenio-devscripts...")
         local("cd %(CFG_INVENIO_PREFIX)s && git clone https://github.com/tiborsimko/invenio-devscripts.git" % env)
         local("cd %(CFG_INVENIO_PREFIX)s && mv invenio-devscripts/* bin/" % env)
+    
+    if env.WITH_WORKDIR:
+        puts(">>> Installing git-new-workdir...")
+        local('wget -O %(CFG_INVENIO_PREFIX)s/bin/git-new-workdir "http://repo.or.cz/w/git.git/blob_plain/HEAD:/contrib/workdir/git-new-workdir"' % env)
+        local("chmod +x %(CFG_INVENIO_PREFIX)s/bin/git-new-workdir" % env)
 
     # OpenOffice temporary directory
     local("mkdir -p %(CFG_INVENIO_PREFIX)s/var/tmp/ooffice-tmp-files" % env)

@@ -28,7 +28,7 @@ import os
 @task
 def repo_configure(repo):
     """ Configure repository """
-    topsrcdir = repo_check(repo)
+    topsrcdir = repo_check(repo, workdir=True)
 
     puts(cyan(">>> Configuring repository: %s ..." % repo))
 
@@ -48,7 +48,7 @@ def repo_configure(repo):
 @task
 def repo_make(repo, *targets):
     """ Run make in repository """
-    topsrcdir = repo_check(repo)
+    topsrcdir = repo_check(repo, workdir=True)
 
     if not targets:
         try:
@@ -76,7 +76,7 @@ def repo_install(repo=None, targets_key='install_targets'):
 @task
 def repo_prepare(repo=None):
     """ Prepare source code after fresh checkout """
-    topsrcdir = repo_check(repo)
+    topsrcdir = repo_check(repo, workdir=True)
     local("cd %s; aclocal && automake -a && autoconf -f" % topsrcdir)
 
 
@@ -85,7 +85,8 @@ def repo_setup(repo, ref):
     """ Clone repository """
     puts(cyan(">>> Setting up repository %s with ref %s..." % (repo, ref)))
 
-    topsrcdir = repo_check(repo, check_path=False)
+    topsrcdir = repo_check(repo, check_path=False, workdir=False)
+    workdir = repo_check(repo, check_path=False, workdir=True)
     gitdir = os.path.join(topsrcdir, '.git')
 
     if not os.path.exists(env.CFG_SRCDIR):
@@ -104,6 +105,8 @@ def repo_setup(repo, ref):
 
     if not os.path.exists(gitdir):
         git_clone(repo)
+    if not os.path.exists(workdir):
+        git_newworkdir(repo)
     git_checkout(repo, ref)
     repo_prepare(repo)
 
@@ -133,7 +136,7 @@ def repo_update(**kwargs):
 
     # Run update
     for repo, ref in repo_refs:
-        topsrcdir = repo_check(repo, check_path=False)
+        topsrcdir = repo_check(repo, check_path=False, workdir=True)
         gitdir = os.path.join(topsrcdir, '.git')
 
         if not os.path.exists(gitdir):
@@ -151,13 +154,15 @@ def repo_update(**kwargs):
 # Helpers
 #
 
-def repo_check(repo, check_path=True):
+def repo_check(repo, check_path=True, workdir=False):
     all_repos = [x[0] for x in env.CFG_INVENIO_REPOS]
 
     if repo not in all_repos:
         abort(red("%s is not a valid repository." % repo))
 
-    repo_path = os.path.join(env.CFG_SRCDIR, repo)
+    repo_path = os.path.join(env.CFG_SRCWORKDIR if workdir else env.CFG_SRCDIR,
+                             repo)
+
     if check_path and not os.path.exists(repo_path):
         abort(red("Repository does not exists %s" % repo_path))
 
@@ -185,7 +190,7 @@ def repo_all_configure_make(repo, target_key):
 #
 
 def git_describe(repo):
-    topsrcdir = repo_check(repo)
+    topsrcdir = repo_check(repo, workdir=True)
     version_gen = os.path.join(topsrcdir, 'git-version-gen')
 
     if os.path.exists(version_gen):
@@ -196,12 +201,12 @@ def git_describe(repo):
 
 
 def git_show_ref(repo):
-    topsrcdir = repo_check(repo)
+    topsrcdir = repo_check(repo, workdir=True)
     local("cd %s; git show-ref" % topsrcdir)
 
 
 def git_reset(repo, ref):
-    topsrcdir = repo_check(repo)
+    topsrcdir = repo_check(repo, workdir=True)
     ctx = {
         'topsrcdir': topsrcdir,
         'ref': ref,
@@ -210,8 +215,23 @@ def git_reset(repo, ref):
     local("cd %(topsrcdir)s; git reset --hard %(ref)s " % ctx)
 
 
+def git_newworkdir(repo):
+    if env.CFG_SRCDIR != env.CFG_SRCWORKDIR:
+        srcdir = repo_check(repo, workdir=False, check_path=False)
+        srcworkdir = repo_check(repo, workdir=True, check_path=False)
+
+        ctx = {
+            'srcdir': srcdir,
+            'srcworkdir': srcworkdir,
+        }
+        ctx.update(env)
+
+        local("%(CFG_INVENIO_PREFIX)s/bin/git-new-workdir %(srcdir)s %(srcworkdir)s" % ctx)
+
+
 def git_checkout(repo, ref):
-    topsrcdir = repo_check(repo)
+    topsrcdir = repo_check(repo, workdir=True)
+
     ctx = {
         'topsrcdir': topsrcdir,
         'ref': ref,
@@ -223,7 +243,7 @@ def git_checkout(repo, ref):
 
 
 def git_clone(repo):
-    topsrcdir = repo_check(repo, check_path=False)
+    topsrcdir = repo_check(repo, check_path=False, workdir=False)
 
     try:
         repo_url = dict(env.CFG_INVENIO_REPOS)[repo]['repository']

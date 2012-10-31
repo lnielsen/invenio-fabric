@@ -55,5 +55,6 @@ Next run:
 
 ```
 cd invenio-fabric/examples/atlantis
-fab loc:py=2.7,ref=master bootstrap
+fab -f fabfile_minimal.py loc bootstrap
+fab -f fabfile_advanced.py loc:py=2.7,ref=master bootstrap
 ```

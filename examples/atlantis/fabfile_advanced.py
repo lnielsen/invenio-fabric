@@ -57,7 +57,7 @@ REFS = {
     },
 }
 
-APACHECTL = 'service apache2'
+
 
 @task
 def loc(activate=True, py=None, ref=None, **kwargs):
@@ -71,38 +71,10 @@ def loc(activate=True, py=None, ref=None, **kwargs):
     else:
         abort(red("Unknown Python version %s" % py))
 
-    name = make_name(py or '', ref or '')
-    prefix = os.path.join(os.getenv('WORKON_HOME', '~/envs'), name)
+    env = env_create('loc', name=make_name(py or '', ref or ''),
+                     activate=activate, **kwargs)
 
-    env = env_create('loc', activate=activate, **kwargs)
-    env.CFG_SRCDIR = os.path.expanduser(os.environ.get("CFG_SRCDIR", "~/src/"))
-
-    env.CFG_INVENIO_SRCDIR = os.path.join(env.CFG_SRCDIR, 'invenio')
-    env.CFG_INVENIO_PREFIX = prefix
-    env.CFG_INVENIO_PORT_HTTP = "4000"
-    env.CFG_INVENIO_PORT_HTTPS = "4000"
-    env.CFG_INVENIO_USER = env.user
-    env.CFG_INVENIO_APACHECTL = APACHECTL
-    env.CFG_INVENIO_ADMIN = 'nobody@localhost'
-
-    env.CFG_INVENIO_REPOS = [
-        ('invenio', {
-            'repository' : 'http://invenio-software.org/repo/invenio/',
-            'ref': 'origin/maint-1.1',
-            'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', ],
-            'deploy_targets': ['all', 'check-upgrade', 'install', ],
-        }),
-    ]
-
-    env.CFG_DATABASE_DUMPDIR = prefix
-    env.CFG_DATABASE_HOST = 'localhost'
-    env.CFG_DATABASE_NAME = name
-    env.CFG_DATABASE_USER = name
-    env.CFG_DATABASE_PASS = name
-    env.CFG_DATABASE_DROP_ALLOWED = True
-
-    env.CFG_MISCUTIL_SMTP_HOST = '127.0.0.1'
-    env.CFG_MISCUTIL_SMTP_PORT = '1025'
+    env.APACHECTL = 'service apache2'
 
     # Override make targets and requirements for specific branches
     if ref in REFS:
@@ -119,7 +91,7 @@ def loc(activate=True, py=None, ref=None, **kwargs):
 #
 def make_name(python, ref):
     ref = ref.split("/")
-    ref = ref[-1]
+    ref = ref[-1].replace("-","_")
     python = python.replace(".","")
 
     name = "atlantis%s%s" % (python, ref)

@@ -19,4 +19,4 @@ def download_file_js(filename):
 global CFG_WSGI_SERVE_STATIC_FILES
 CFG_WSGI_SERVE_STATIC_FILES = True
 
-_app.run(debug=True, port={{CFG_INVENIO_PORT_HTTP}})
+_app.run(debug=True, port={{CFG_INVENIO_PORT_HTTPS}})

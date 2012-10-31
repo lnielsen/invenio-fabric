@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-# A Fabric file for installing, deploying and running Invenio on CERN
-# SLC5/6 hosts.
-#
-# Lars Holm Nielsen <lars.holm.nielsen@cern.ch>
-#
 # Copyright (C) 2012 CERN.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -25,12 +20,24 @@ from setuptools import setup, find_packages
 
 setup(
     name='invenio-fabric',
-    version='0.2',
+    version='0.2.1',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=False,
     zip_safe=False,
     install_requires=['distribute', 'Fabric>=1.4', 'Jinja2', 'virtualenvwrapper'],
+    data_files=[
+        ('share/atlantis/',[
+            'examples/atlantis/fabfile_advanced.py',
+            'examples/atlantis/fabfile_minimal.py',
+        ]),
+        ('share/atlantis/common/',[
+            'examples/atlantis/common/activate-profile.tpl',
+            'examples/atlantis/common/requirements.txt',
+            'examples/atlantis/common/requirements-extra.txt',
+            'examples/atlantis/common/rundevserver.py.tpl',
+        ]),
+    ],
 
     author='Lars Holm Nielsen',
     author_email='lars.holm.nielsen@cern.ch',

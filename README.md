@@ -22,7 +22,7 @@ Virtualenvwrapper:
 ```
 export WORKON_HOME=~/envs
 mkdir -p $WORKON_HOME
-pip install virtualenv Fabric virtualenvwrapper invenio-fabric
+pip install invenio-fabric
 curl -kL http://xrl.us/pythonbrewinstall | bash
 ```
 
@@ -55,6 +55,6 @@ Next run:
 
 ```
 cd invenio-fabric/examples/atlantis
-fab -f fabfile_minimal.py loc bootstrap
+fab -f fabfile_minimal.py loc:name=somename bootstrap
 fab -f fabfile_advanced.py loc:py=2.7,ref=master bootstrap
 ```

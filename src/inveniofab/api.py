@@ -24,7 +24,8 @@ of your file::
 """
 
 from inveniofab.apache import apache_start, apache_restart, apache_stop
-from inveniofab.env import env_defaults, env_get, env_create
+from inveniofab.env import env_defaults, env_get, env_create, env_override, \
+    env_make_name
 from inveniofab.git import repo_update, repo_setup, repo_prepare, \
     repo_install, repo_make, repo_configure
 from inveniofab.invenio import invenio_conf, invenio_create_demosite, \

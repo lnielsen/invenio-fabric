@@ -16,10 +16,11 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 from fabric.api import prompt, env, local
-import getpass
-import os
 from jinja2 import Environment, FileSystemLoader
 from jinja2.exceptions import TemplateNotFound
+import getpass
+import os
+import re
 
 def prompt_and_check(questions, check_func, stored_answers=None):
     """
@@ -100,3 +101,24 @@ def write_template(filename, context, tpl_str=None, tpl_file=None, append=False,
 def python_version():
     """ Determine Python version """
     return local(("%(CFG_INVENIO_PREFIX)s/bin/python -c \"import sys;print str(sys.version_info[0]) + '.' + str(sys.version_info[1])\"") % env, capture=True)
+
+
+def pythonbrew_versions():
+    """ Get all installed Pythonbrew versions """
+    pythonsdir = os.path.join(os.environ.get('PYTHONBREW_ROOT',
+                          os.path.expanduser('~/.pythonbrew')), 'pythons')
+
+    version_dict = {}
+    pat = re.compile("Python-(\d\.\d.\d)")
+
+    for d in os.listdir(pythonsdir):
+        pydir = os.path.join(pythonsdir, d)
+        pybin = os.path.join(pydir, 'bin/python')
+        m = pat.match(d)
+
+        if m and os.path.isdir(pydir) and os.path.exists(pybin):
+            major, minor, patch = m.group(1).split('.')
+            version_dict["%s%s%s" % (major, minor, patch)] = pybin
+            version_dict["%s%s" % (major, minor)] = pybin
+
+    return version_dict

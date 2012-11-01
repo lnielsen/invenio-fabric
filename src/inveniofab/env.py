@@ -22,9 +22,10 @@ if you want to say copy a database from production to integration, and thus
 needs access to both environments at the same time.
 """
 
-from fabric.api import execute, abort, task
 from fabric import state
+from fabric.api import execute, abort, task
 from fabric.api import task, abort
+from inveniofab.utils import pythonbrew_versions
 from jinja2 import Environment, FileSystemLoader
 import copy
 import os
@@ -97,7 +98,7 @@ def env_get(name):
     return env.loaded_envs[name]
 
 
-def env_defaults(env, name='invenio', prefix=None, **kwargs):
+def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
     """
     Setup defaults in environment.
 
@@ -114,6 +115,18 @@ def env_defaults(env, name='invenio', prefix=None, **kwargs):
         'db-slave': [],
         'workers': [],
     }
+
+    if python is None:
+        pythonbin = 'python'
+    else:
+        python_versions = pythonbrew_versions()
+        if python in python_versions:
+            pythonbin = python_versions[python]
+        else:
+            python_versions = python_versions.keys()
+            python_versions.sort()
+            abort("Unknown Python version %s. Available versions are %s" % (
+                  python, ", ".join(python_versions)))
 
     env.update({
         'REQUIREMENTS': ['requirements.txt', 'requirements-extra.txt', ],
@@ -161,6 +174,36 @@ def env_defaults(env, name='invenio', prefix=None, **kwargs):
 
     return env
 
-#
-# Helper tasks
-# 
+
+def env_override(env, this_repo, this_ref, repo_overrides):
+    """ Override default values for repository """
+    if this_repo not in repo_overrides or this_ref not in repo_overrides[this_repo]:
+        return env
+
+    this_repo_dict = repo_overrides[this_repo][this_ref]
+
+    def _mapper(repo, repo_dict):
+        if repo == this_repo:
+            repo_dict.update(this_repo_dict)
+            repo_dict['ref'] = this_ref
+        return (repo, repo_dict)
+
+    env.CFG_INVENIO_REPOS = map(_mapper, env.CFG_INVENIO_REPOS)
+
+    return env
+
+
+def env_make_name(prefix, python, ref):
+    """ Generate a MySQL friendly environment name. """
+    ref = ref.split("/")
+    ref = ref[-1].replace("-","_")
+    python = python.replace(".","")
+    
+    prefix = prefix.replace("_","").replace("-","")
+
+    name = "%s%s%s" % (prefix, python, ref)
+    if len(name) > 16:
+        name = name.replace("_", "", len(name) - 16)
+        return name[:16]
+
+    return name

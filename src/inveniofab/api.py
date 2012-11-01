@@ -27,7 +27,7 @@ from inveniofab.apache import apache_start, apache_restart, apache_stop
 from inveniofab.env import env_defaults, env_get, env_create, env_override, \
     env_make_name
 from inveniofab.git import repo_update, repo_setup, repo_prepare, \
-    repo_install, repo_make, repo_configure
+    repo_install, repo_make, repo_configure, repo_check
 from inveniofab.invenio import invenio_conf, invenio_create_demosite, \
     invenio_createdb, invenio_upgrade
 from inveniofab.mysql import mysql_dropdb, mysql_createdb, mysql_load, \

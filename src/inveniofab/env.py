@@ -166,7 +166,7 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
     env.CFG_INVENIO_REPOS = [
         ('invenio', {
             'repository' : 'http://invenio-software.org/repo/invenio/',
-            'ref': 'origin/master',
+            'ref': 'master',
             'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', ],
             'deploy_targets': ['all', 'check-upgrade', 'install', ],
         }),
@@ -175,14 +175,19 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
     return env
 
 
-def env_override(env, this_repo, this_ref, repo_overrides):
+def env_override(env, this_repo, this_ref, override={}, global_overrides=None ):
     """ Override default values for repository """
-    if this_repo not in repo_overrides or this_ref not in repo_overrides[this_repo]:
-        return env
+    if global_overrides:
+        try:
+            this_repo_dict = global_overrides[this_repo][this_ref]
+        except KeyError:
+            return env
+    else:
+        this_repo_dict = override
 
-    this_repo_dict = repo_overrides[this_repo][this_ref]
+    def _mapper(x):
+        repo, repo_dict = x
 
-    def _mapper(repo, repo_dict):
         if repo == this_repo:
             repo_dict.update(this_repo_dict)
             repo_dict['ref'] = this_ref

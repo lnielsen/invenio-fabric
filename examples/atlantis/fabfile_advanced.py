@@ -75,4 +75,4 @@ def loc(activate=True, py=None, ref=None, **kwargs):
     env = env_create('loc', name=env_make_name('atlantis', py or '', ref or ''),
                      activate=activate, python=py, **kwargs)
 
-    return env_override(env, 'invenio', ref, REF_OVERRIDE)
+    return env_override(env, 'invenio', ref, global_overrides=REF_OVERRIDE)

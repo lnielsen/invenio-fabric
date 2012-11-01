@@ -241,11 +241,12 @@ def mysql_admin_check(host, port):
         ctx = {'host': host, 'port': port}
         ctx.update(answers)
         try:
-            with hide('everything', 'status', 'output', 'commands'):
-                if answers['password']:
-                    res = local("""mysql -u %(user)s --password=%(password)s -h %(host)s -P %(port)s -e 'SELECT 1'""" % ctx)
-                else:
-                    res = local("""mysql -u %(user)s -h %(host)s -P %(port)s -e 'SELECT 1'""" % ctx)
+            #FIXME: Hides everything onwards instead of only the the two commands below.
+            #with hide('everything', 'status', 'output', 'commands'):
+            if answers['password']:
+                res = local("""mysql -u %(user)s --password=%(password)s -h %(host)s -P %(port)s -e 'SELECT 1'""" % ctx)
+            else:
+                res = local("""mysql -u %(user)s -h %(host)s -P %(port)s -e 'SELECT 1'""" % ctx)
             return True
         except SystemExit:
             puts(red("MySQL admin user/password is not valid. Please try again."))

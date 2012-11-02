@@ -22,7 +22,7 @@ import getpass
 import os
 import re
 
-def prompt_and_check(questions, check_func, stored_answers=None):
+def prompt_and_check(questions, check_func, cache_key=None, stored_answers=None):
     """
     Ask user for questions, and check answers with supplied function
     """
@@ -33,6 +33,9 @@ def prompt_and_check(questions, check_func, stored_answers=None):
             answers = stored_answers
             done = True
 
+    if cache_key and cache_key in env.get('answers_cache',{}):
+        return env.answers_cache[cache_key]
+
     while not done:
         answers = {}
         for q, key in questions:
@@ -42,6 +45,11 @@ def prompt_and_check(questions, check_func, stored_answers=None):
                 answers[key] = prompt(q)
         if check_func(answers):
             done = True
+
+    if cache_key:
+        if 'answers_cache' not in env:
+            env.answers_cache = {}
+        env.answers_cache[cache_key] = answers
     return answers
 
 

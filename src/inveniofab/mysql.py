@@ -36,7 +36,9 @@ def mysql_dropdb(stored_answers=None):
     answers = prompt_and_check([
         ("MySQL admin user:", "user"),
         ("MySQL admin password:", "password")
-    ], mysql_admin_check(env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT), stored_answers=stored_answers)
+    ], mysql_admin_check(env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT),
+    cache_key="mysql://%s:%s" % (env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT),
+    stored_answers=stored_answers)
 
     user_pw = '-u %(user)s --password=%(password)s' % answers if answers['password'] else '-u %(user)s' % answers
 
@@ -65,7 +67,9 @@ def mysql_createdb(stored_answers=None):
     answers = prompt_and_check([
         ("MySQL admin user:", "user"),
         ("MySQL admin password:", "password")
-    ], mysql_admin_check(env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT), stored_answers=stored_answers)
+    ], mysql_admin_check(env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT), 
+    cache_key="mysql://%s:%s" % (env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT),
+    stored_answers=stored_answers)
 
     user_pw = '-u %(user)s --password=%(password)s' % answers if answers['password'] else '-u %(user)s' % answers
 
@@ -149,7 +153,9 @@ def mysql_load(dumpfile=None, stored_answers=None):
     answers = prompt_and_check([
         ("MySQL admin user:", "user"),
         ("MySQL admin password:", "password")
-    ], mysql_admin_check(env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT), stored_answers)
+    ], mysql_admin_check(env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT), 
+    cache_key="mysql://%s:%s" % (env.CFG_DATABASE_HOST, env.CFG_DATABASE_PORT),
+    stored_answers=stored_answers)
 
     user_pw = '-u %(user)s --password=%(password)s' % answers if answers['password'] else '-u %(user)s' % answers
 
@@ -247,6 +253,7 @@ def mysql_admin_check(host, port):
                 res = local("""mysql -u %(user)s --password=%(password)s -h %(host)s -P %(port)s -e 'SELECT 1'""" % ctx)
             else:
                 res = local("""mysql -u %(user)s -h %(host)s -P %(port)s -e 'SELECT 1'""" % ctx)
+
             return True
         except SystemExit:
             puts(red("MySQL admin user/password is not valid. Please try again."))

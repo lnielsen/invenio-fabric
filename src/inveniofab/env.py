@@ -134,7 +134,7 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
         'WITH_DEVSERVER': True,
         'WITH_WORKDIR': True,
         'WITH_DEVSCRIPTS': True,
-        'PYTHON': kwargs.get('python', 'python'),
+        'PYTHON': pythonbin,
         'ACTIVATE': '. %(CFG_INVENIO_PREFIX)s/bin/activate',
         'CFG_INVENIO_REPOS': [],
         'CFG_INVENIO_CONF': 'etc/invenio-local.conf',

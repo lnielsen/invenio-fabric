@@ -20,6 +20,8 @@ Compound tasks to perform bigger operations like bootstrapping Invenio
 """
 
 from fabric.api import task, env
+from fabric.colors import cyan
+from fabric.contrib.console import confirm
 from inveniofab.devserver import devserver_conf
 from inveniofab.git import repo_update, repo_install
 from inveniofab.invenio import invenio_conf, invenio_createdb, \
@@ -31,28 +33,39 @@ from inveniofab.venv import venv_create, venv_requirements, venv_dump, \
 
 
 @task
-def bootstrap(with_db=True, **kwargs):
+def bootstrap(with_db=True, ask=False, **kwargs):
     """ Bootstrap Invenio installation """
+
+    def _confirm_step(func, *args, **kwargs):
+        if ask and confirm(cyan("Run step %s?" % func.__name__)):
+            func(*args, **kwargs)
+
     if with_db:
-        mysql_createdb()
-    venv_create()
-    repo_update(**kwargs)
-    venv_requirements()
-    repo_install(targets_key='bootstrap_targets')
-    invenio_conf()
+        _confirm_step(mysql_dropdb)
+        _confirm_step(mysql_createdb)
+    _confirm_step(venv_create)
+    _confirm_step(repo_update, **kwargs)
+    _confirm_step(venv_requirements)
+    _confirm_step(repo_install, targets_key='bootstrap_targets')
+    _confirm_step(invenio_conf)
     if env.WITH_DEVSERVER:
-        devserver_conf()
+        _confirm_step(devserver_conf)
     if with_db:
-        invenio_createdb()
+        _confirm_step(invenio_createdb)
 
 
 @task
-def install(**kwargs):
+def install(ask=False, **kwargs):
     """ Install changes """
-    repo_update(**kwargs)
-    repo_install(targets_key='deploy_targets')
-    invenio_conf()
-    invenio_upgrade()
+
+    def _confirm_step(func, *args, **kwargs):
+        if ask and confirm("Run step %s?" % func.__name__):
+            func(*args, **kwargs)
+
+    _confirm_step(repo_update, **kwargs)
+    _confirm_step(repo_install, targets_key='deploy_targets')
+    _confirm_step(invenio_conf)
+    _confirm_step(invenio_upgrade)
 
 
 @task

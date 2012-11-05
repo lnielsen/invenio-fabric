@@ -13,7 +13,7 @@ gnuplot-py==1.8
 invenio-devserver
 {% endif %}
 pylint
-http://sourceforge.net/projects/pychecker/files/pychecker/0.8.19/pychecker-0.8.19.tar.gz/download
+http://sourceforge.net/projects/pychecker/files/pychecker/0.8.19/pychecker-0.8.19.tar.gz
 pep8{% if pyver == "2.4" %}==1.2{% endif %}
 {% if pyver != "2.4" and pyver != "2.5" %}autopep8{% endif %}
 # Later version of simplejson doesn't support Python 2.4

@@ -20,7 +20,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='invenio-fabric',
-    version='0.2.1',
+    version='0.2.2',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=False,
@@ -39,7 +39,7 @@ setup(
         ]),
     ],
 
-    author='Lars Holm Nielsen',
+    author='CERN',
     author_email='lars.holm.nielsen@cern.ch',
     description='Fabric tasks for working with Invenio repository software',
     license="GPL",

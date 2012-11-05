@@ -18,6 +18,7 @@
 import os
 from fabric.api import local, puts, env, task, abort, warn
 from fabric.colors import red, cyan
+from fabric.contrib.console import confirm
 from inveniofab.utils import write_template
 from jinja2.exceptions import TemplateNotFound
 
@@ -70,7 +71,11 @@ def invenio_conf():
         try:
             write_template(invenio_local_remote, env, tpl_file=invenio_local)
         except TemplateNotFound:
-            abort(red("Could not find template %s" % invenio_local))
+            puts(red("Could not find template %s" % invenio_local))
+            if not confirm("Use built-in template for invenio-local.conf?"):
+                abort("User aborted")
+            else:
+                write_template(invenio_local_remote, env, tpl_str=INVENIO_LOCAL_TPL)
 
     inveniocfg("--update-all")
 

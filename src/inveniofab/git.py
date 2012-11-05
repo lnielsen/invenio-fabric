@@ -160,8 +160,8 @@ def repo_check(repo, check_path=True, workdir=False):
     if repo not in all_repos:
         abort(red("%s is not a valid repository." % repo))
 
-    repo_path = os.path.join(env.CFG_SRCWORKDIR if workdir else env.CFG_SRCDIR,
-                             repo)
+    repo_path = os.path.join(env.CFG_SRCWORKDIR if workdir and env.WITH_WORKDIR
+                             else env.CFG_SRCDIR, repo)
 
     if check_path and not os.path.exists(repo_path):
         abort(red("Repository does not exists %s" % repo_path))
@@ -216,7 +216,7 @@ def git_reset(repo, ref):
 
 
 def git_newworkdir(repo):
-    if env.CFG_SRCDIR != env.CFG_SRCWORKDIR:
+    if env.WITH_WORKDIR and env.CFG_SRCDIR != env.CFG_SRCWORKDIR:
         srcdir = repo_check(repo, workdir=False, check_path=False)
         srcworkdir = repo_check(repo, workdir=True, check_path=False)
 

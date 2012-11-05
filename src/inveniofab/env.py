@@ -141,6 +141,7 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
         'CFG_INVENIO_SRCDIR': os.path.join(prefix, 'src/invenio'),
         'CFG_INVENIO_PREFIX': prefix,
         'CFG_SRCDIR' : os.environ.get('CFG_SRCDIR', os.path.join(prefix, 'src')),
+        # Only use CFG_SRCWORKDIR if WITH_WORKDIR is True
         'CFG_SRCWORKDIR' : os.path.join(prefix, 'src'),
         'CFG_INVENIO_HOSTNAME': "localhost",
         'CFG_INVENIO_DOMAINNAME': "",

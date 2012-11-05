@@ -145,7 +145,7 @@ def venv_create():
         puts(">>> Installing invenio-devscripts...")
         local("cd %(CFG_INVENIO_PREFIX)s && git clone https://github.com/tiborsimko/invenio-devscripts.git" % env)
         local("cd %(CFG_INVENIO_PREFIX)s && mv invenio-devscripts/* bin/" % env)
-    
+
     if env.WITH_WORKDIR:
         puts(">>> Installing git-new-workdir...")
         local('wget -O %(CFG_INVENIO_PREFIX)s/bin/git-new-workdir "http://repo.or.cz/w/git.git/blob_plain/HEAD:/contrib/workdir/git-new-workdir"' % env)

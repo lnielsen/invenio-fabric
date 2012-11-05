@@ -44,17 +44,16 @@ Usage
 =====
 Invenio Fabric is only a library of Fabric tasks, so you need to create your
 own ``fabfile.py``. For a complete example for Atlantis Institute of Fictive Science
-please see ``examples/atlantis/``. First, make sure your Invenio source code is in 
-`~/src/` or alternative specify ``CFG_SRCDIR``  in your startup file:
+please see ``examples/atlantis/``. First, specify where your Invenio source code is located
+via ``CFG_SRCDIR``  environment variable in your startup file:
 
 ```
 export CFG_SRCDIR=~/private/src/
 ```
 
-Next run:
+Next, run:
 
 ```
 cd invenio-fabric/examples/atlantis
-fab -f fabfile_minimal.py loc:name=somename bootstrap
-fab -f fabfile_advanced.py loc:py=2.7,ref=master bootstrap
+fab loc:py=2.4,ref=master bootstrap
 ```

@@ -38,7 +38,7 @@ import os
 
 REF_OVERRIDE = {
     'invenio' : {
-        'jkuncar-public/flask' : {
+        'flask' : {
             'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin',
                 'install-ckeditor-plugin', 'install-pdfa-helper-files',
                 'install-jquery-plugins', 'install-jquery-tokeninput',

@@ -33,11 +33,11 @@ from inveniofab.venv import venv_create, venv_requirements, venv_dump, \
 
 
 @task
-def bootstrap(with_db=True, ask=False, **kwargs):
+def bootstrap(with_db=True, quite=False, **kwargs):
     """ Bootstrap Invenio installation """
 
     def _confirm_step(func, *args, **kwargs):
-        if ask and confirm(cyan("Run step %s?" % func.__name__)):
+        if quite or confirm(cyan("Run step %s?" % func.__name__)):
             func(*args, **kwargs)
 
     if with_db:
@@ -55,11 +55,11 @@ def bootstrap(with_db=True, ask=False, **kwargs):
 
 
 @task
-def install(ask=False, **kwargs):
+def install(quite=False, **kwargs):
     """ Install changes """
 
     def _confirm_step(func, *args, **kwargs):
-        if ask and confirm("Run step %s?" % func.__name__):
+        if quite or confirm("Run step %s?" % func.__name__):
             func(*args, **kwargs)
 
     _confirm_step(repo_update, **kwargs)

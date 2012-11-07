@@ -30,6 +30,37 @@ from jinja2 import Environment, FileSystemLoader
 import copy
 import os
 
+GLOBAL_REFS_OVERRIDE = {
+    'invenio' : {
+        'next' : {
+            'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin',
+                'install-ckeditor-plugin', 'install-pdfa-helper-files',
+                'install-jquery-plugins', 'install-jquery-tokeninput',
+                'install-bootstrap' ],
+            'deploy_targets': ['all', 'check-upgrade', 'install', ],
+            'requirements' : ['%(CFG_INVENIO_SRCDIR)s/requirements.txt',
+                '%(CFG_INVENIO_SRCDIR)s/requirements-extras.txt',
+                '%(CFG_INVENIO_SRCDIR)s/requirements-flask.txt',
+                '%(CFG_INVENIO_SRCDIR)s/requirements-flask-ext.txt',],
+        },
+        'origin/v0.99.0' : {
+            'bootstrap_targets' : ['all', 'install'],
+            'deploy_targets' : ['all', 'install'],
+        },
+        'origin/v0.99.5' : {
+            'bootstrap_targets' : ['all', 'install'],
+            'deploy_targets' : ['all', 'install'],
+        },
+    },
+}
+"""
+Overrides installation procedure for a specific branch.
+
+Certain branches might have special installation requirements which does not
+match the default. This dictionary allows you to override the default values.
+"""
+
+
 def env_create(envname, defaults_func=None, activate=True, **kwargs):
     """
     Create a new environment (e.g. integration, production,

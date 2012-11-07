@@ -29,7 +29,11 @@ import os
 @task
 def venv_requirements():
     """ Install Python requirements """
-    if 'REQUIREMENTS' not in env:
+    requirements = []
+    for repo, info in env.CFG_INVENIO_REPOS:
+        requirements.extend([(repo, x) for x in info.get('requirements', [])])
+
+    if not requirements:
         puts(cyan(">>> No requirements defined..."))
         return
 
@@ -37,10 +41,10 @@ def venv_requirements():
 
     pyver = python_version()
 
-    for reqfile in env.REQUIREMENTS:
+    for repo, reqfile in requirements:
         reqfile = reqfile % env
-        reqpath = os.path.join(env.CFG_INVENIO_PREFIX, os.path.basename(reqfile))
-        
+        reqpath = os.path.join(env.CFG_INVENIO_PREFIX, "%s_%s" % (repo, os.path.basename(reqfile)))
+
         ctx = {'reqpath': reqpath, 'reqfile': reqfile, 'pyver': pyver}
         ctx.update(env)
 

@@ -129,7 +129,6 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
                   python, ", ".join(python_versions)))
 
     env.update({
-        'REQUIREMENTS': ['requirements.txt', 'requirements-extra.txt', ],
         'WITH_VIRTUALENV': True,
         'WITH_DEVSERVER': True,
         'WITH_WORKDIR': True,
@@ -138,8 +137,8 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
         'ACTIVATE': '. %(CFG_INVENIO_PREFIX)s/bin/activate',
         'CFG_INVENIO_REPOS': [],
         'CFG_INVENIO_CONF': 'etc/invenio-local.conf',
-        'CFG_INVENIO_SRCDIR': os.path.join(prefix, 'src/invenio'),
         'CFG_INVENIO_PREFIX': prefix,
+        'CFG_INVENIO_SRCDIR' : os.path.join(prefix, 'src/invenio'),
         'CFG_SRCDIR' : os.environ.get('CFG_SRCDIR', os.path.join(prefix, 'src')),
         # Only use CFG_SRCWORKDIR if WITH_WORKDIR is True
         'CFG_SRCWORKDIR' : os.path.join(prefix, 'src'),
@@ -170,6 +169,7 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
             'ref': 'master',
             'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', ],
             'deploy_targets': ['all', 'check-upgrade', 'install', ],
+            'requirements': ['requirements.txt', 'requirements-extra.txt', ],
         }),
     ]
 
@@ -183,8 +183,13 @@ def env_override(env, this_repo, this_ref, override={}, global_overrides=None ):
             this_repo_dict = global_overrides[this_repo][this_ref]
         except KeyError:
             return env
-    else:
+    elif override:
         this_repo_dict = override
+    else:
+        try:
+            this_repo_dict = GLOBAL_REFS_OVERRIDE[this_repo][this_ref]
+        except KeyError:
+            return env
 
     def _mapper(x):
         repo, repo_dict = x

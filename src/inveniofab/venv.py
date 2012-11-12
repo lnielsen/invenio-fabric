@@ -27,6 +27,17 @@ import os
 
 
 @task
+def venv_pyuno_install():
+    """ Install Python OpenOffice binding """
+    pyver = python_version()
+    ctx = {'pyver': pyver}
+    ctx.update(env)
+
+    local("cp  `find /usr/ -name uno.py 2>/dev/null | head -n 1` %(CFG_INVENIO_PREFIX)s/lib/python%(pyver)s/site-packages/" % ctx)
+    local("cp `find /usr/ -name unohelper.py 2>/dev/null | head -n 1` %(CFG_INVENIO_PREFIX)s/lib/python%(pyver)s/site-packages/" % ctx)
+
+
+@task
 def venv_requirements():
     """ Install Python requirements """
     requirements = []

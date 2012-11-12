@@ -22,7 +22,9 @@ against a known state.
 
 from fabric.api import task, puts, local, env
 from fabric.colors import cyan
+from fabric.contrib.console import confirm
 from inveniofab.mysql import mysql_dump, mysql_load
+from inveniofab.git import repo_all_configure_make
 import os
 
 
@@ -64,11 +66,15 @@ def test_reset_admin():
 
 
 @task
-def test_load(repo=None):
+def test_load(repo=None, quite=True):
     """ Load test environment """
-    puts(cyan(">>> Loading test package..." % env))
-    local("sudo rsync --delete -rLptgoDv %(CFG_INVENIO_PREFIX)s/tests/var/ %(CFG_INVENIO_PREFIX)s/var/" % env)
-    local("sudo rsync --delete -rLptgoDv %(CFG_INVENIO_PREFIX)s/tests/etc/ %(CFG_INVENIO_PREFIX)s/etc/" % env)
+    if quite or confirm(cyan("Run step load_files?")):
+        puts(cyan(">>> Loading test package..." % env))
+        local("sudo rsync --delete -rLptgoDv %(CFG_INVENIO_PREFIX)s/tests/var/ %(CFG_INVENIO_PREFIX)s/var/" % env)
+        local("sudo rsync --delete -rLptgoDv %(CFG_INVENIO_PREFIX)s/tests/etc/ %(CFG_INVENIO_PREFIX)s/etc/" % env)
 
-    mysql_load(dumpfile=os.path.join(env.CFG_INVENIO_PREFIX, "tests/%s.sql.gz" % env.CFG_DATABASE_NAME))
-    repo_all_configure_make(repo, target_key='deploy_targets')
+    if quite or confirm(cyan("Run step load_db?")):
+        mysql_load(dumpfile=os.path.join(env.CFG_INVENIO_PREFIX, "tests/%s.sql.gz" % env.CFG_DATABASE_NAME))
+
+    if quite or confirm(cyan("Run step configure_make_install?")):
+        repo_all_configure_make(repo, target_key='deploy_targets')

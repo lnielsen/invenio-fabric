@@ -36,43 +36,14 @@ from fabric.colors import red
 from inveniofab.api import *
 import os
 
-REF_OVERRIDE = {
-    'invenio' : {
-        'flask' : {
-            'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin',
-                'install-ckeditor-plugin', 'install-pdfa-helper-files',
-                'install-jquery-plugins', 'install-jquery-tokeninput',
-                'install-bootstrap' ],
-            'deploy_targets': ['all', 'check-upgrade', 'install', ],
-            'requirements' : ['%(CFG_INVENIO_SRCDIR)s/requirements.txt', 
-                '%(CFG_INVENIO_SRCDIR)s/requirements-extras.txt',
-                '%(CFG_INVENIO_SRCDIR)s/requirements-flask.txt',
-                '%(CFG_INVENIO_SRCDIR)s/requirements-flask-ext.txt',],
-        },
-        'origin/v0.99.0' : {
-            'bootstrap_targets' : ['all', 'install'],
-            'deploy_targets' : ['all', 'install'],
-        },
-        'origin/v0.99.5' : {
-            'bootstrap_targets' : ['all', 'install'],
-            'deploy_targets' : ['all', 'install'],
-        },
-    },
-}
-"""
-Overrides installation procedure for a specific branch.
-
-Certain branches might have special installation requirements which does not
-match the default. This dictionary allows you to override the default values.
-"""
-
-
 @task
 def loc(activate=True, py=None, ref=None, **kwargs):
     """
     Local environment (example: loc:py=24,ref=maint-1.1)
     """
-    env = env_create('loc', name=env_make_name('atlantis', py or '', ref or ''),
-                     activate=activate, python=py, **kwargs)
+    if 'name' not in kwargs:
+        kwargs['name'] = env_make_name('atlantis', py or '', ref or '')
 
-    return env_override(env, 'invenio', ref, global_overrides=REF_OVERRIDE)
+    env = env_create('loc', activate=activate, python=py, **kwargs)
+
+    return env_override(env, 'invenio', ref)

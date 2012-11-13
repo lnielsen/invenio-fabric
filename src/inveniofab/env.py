@@ -227,7 +227,8 @@ def env_override(env, this_repo, this_ref, override={}, global_overrides=None ):
 
         if repo == this_repo:
             repo_dict.update(this_repo_dict)
-            repo_dict['ref'] = this_ref
+            if this_ref:
+                repo_dict['ref'] = this_ref
         return (repo, repo_dict)
 
     env.CFG_INVENIO_REPOS = map(_mapper, env.CFG_INVENIO_REPOS)

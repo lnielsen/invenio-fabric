@@ -16,7 +16,15 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 """
-Invenio Fabric tasks for Apache
+Tasks for Apache start/stop/restarting apache. 
+
+All tasks assume ``env.CFG_INVENIO_APACHECTL`` is defined and points to your
+Apache control script (e.g. ``/etc/init.d/apache2`` or ``../apachectl``). The
+script must support the following commands: start, stop, configtest, graceful.
+
+.. warning::
+
+  These tasks are not working locally like the rest Invenio Fabric library.
 """
 
 from fabric.api import roles, sudo, task, env
@@ -24,14 +32,19 @@ from fabric.api import roles, sudo, task, env
 @roles('web')
 @task
 def apache_start():
-    """ Restart Apache """
+    """ Start Apache """
     sudo("%(CFG_INVENIO_APACHECTL)s start" % env)
 
 
 @roles('web')
 @task
 def apache_restart():
-    """ Restart Apache """
+    """
+    Restart Apache
+    
+    The task will first test the configuration and afterwards gracefully
+    restart Apache.
+    """
     sudo("%(CFG_INVENIO_APACHECTL)s configtest" % env)
     sudo("%(CFG_INVENIO_APACHECTL)s graceful" % env)
 
@@ -39,5 +52,5 @@ def apache_restart():
 @roles('web')
 @task
 def apache_stop():
-    """ Restart Apache """
+    """ Stop Apache """
     sudo("%(CFG_INVENIO_APACHECTL)s stop" % env)

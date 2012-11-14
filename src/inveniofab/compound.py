@@ -16,7 +16,7 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 """
-Compound tasks to perform bigger operations like bootstrapping Invenio
+Compound tasks to perform bigger operations like bootstrapping Invenio.
 """
 
 from fabric.api import task, env
@@ -34,7 +34,27 @@ from inveniofab.venv import venv_create, venv_requirements, venv_dump, \
 
 @task
 def bootstrap(with_db=True, quite=False, **kwargs):
-    """ Bootstrap Invenio installation """
+    """
+    Bootstrap an Invenio installation
+    
+    Bootstrap will run the following tasks:
+    
+     * ``mysql_dropdb`` - to drop an existing database if it exists.
+     * ``mysql_createdb`` - to create database and user.
+     * ``venv_create`` - to create a virtual environment.
+     * ``repo_update`` - to checkout source code from repositories.
+     * ``venv_requirements`` - to install Python requirements.
+     * ``repo_install`` - to install all repositories.
+     * ``invenio_conf`` - to configure Invenio.
+     * ``devserver_conf`` - to configure the development server.
+     * ``invenio_createdb`` - to create Invenio database tables.
+
+    If a task fails, you can re-run bootstrap and skip the initial steps which
+    already was completed.
+
+    :param quite: Default ``False``. Set to ``True`` to disable user confirmation.
+    :param with_db: Default ``True``. Run database related tasks to create the database.
+    """
 
     def _confirm_step(func, *args, **kwargs):
         if quite or confirm(cyan("Run step %s?" % func.__name__)):
@@ -56,7 +76,14 @@ def bootstrap(with_db=True, quite=False, **kwargs):
 
 @task
 def install(quite=False, **kwargs):
-    """ Install changes """
+    """
+    Install repositories
+    
+    The task will checkout latest changes for the repositories, run make install,
+    ``inveniocfg --update-all --upgrade``.
+    
+    :param quite: Default ``False``. Set to ``True`` to disable user confirmation.
+    """
 
     def _confirm_step(func, *args, **kwargs):
         if quite or confirm("Run step %s?" % func.__name__):
@@ -70,20 +97,34 @@ def install(quite=False, **kwargs):
 
 @task
 def dump():
-    """ Archive installation """
+    """
+    Archive installation
+    
+    Dump a database and virtual environment to an archive which can later be
+    restored with :meth:`~load`.
+    """
     mysql_dump()
     venv_dump()
 
 
 @task
 def load():
-    """ Load archived installation """
+    """
+    Load archived installation
+    
+    Load an archived virtual environment and database which was dumped with
+    :meth:`~dump`.
+    """
     venv_load()
     mysql_load()
 
 
 @task
 def drop():
-    """ Remove installation """
+    """
+    Remove installation
+    
+    Remove virtual environment, database and database user.
+    """
     venv_drop()
     mysql_dropdb()

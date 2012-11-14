@@ -28,7 +28,28 @@ import stat
 
 @task
 def devserver_conf():
-    """ Upload and update Invenio configuration """
+    """ 
+    Render and update invenio-devserver configuration
+
+    The task will look for the template ``config_local.py.tpl``, and render and
+    write it to ``config_local.py`` in the virtual environments site-packages.
+    
+    The invenio-devserver install two commands:
+    
+      * ``serve`` - Invenio development server based on Werkzeug.
+      * ``mailserve`` - Debug mail server which will print all emails to the console.
+    
+    .. note::
+    
+        The invenio-devserver works with the non-Flask based versions of Invenio. 
+        Also, the invenio-devserver is only installed if ``env.WITH_DEVSERVER`` is
+        ``True``.
+    
+    .. seealso::
+    
+       See also invenio-devserver for further information on the content of
+       ``config_local.py.tpl``: https://bitbucket.org/osso/invenio-devserver
+    """
     puts(cyan(">>> Configuring invenio-devserver..." % env))
 
     pyver = python_version()
@@ -45,7 +66,20 @@ def devserver_conf():
 
 @task
 def devserver_install_flask():
-    """ Install a Flask devserver """
+    """
+    Install a Flask devserver
+    
+    The task will look for the template ``rundevserver.py.tpl``, render it and
+    write it to ``bin/rundevserver.py``.
+    
+    To start the Flask development server, run::
+    
+      (venv)$ rundevserver.py
+    
+    .. note::
+    
+       ``rundevserver.py`` only works with Flask based versions of Invenio.
+    """
     puts(cyan(">>> Configuring Flask devserver..." % env))
     
     local_file = 'rundevserver.py.tpl'

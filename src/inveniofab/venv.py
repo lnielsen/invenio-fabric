@@ -16,7 +16,9 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 """
-Task for creating and installing a Python virtual environment.
+Tasks for creating and installing Python virtual environments.
+
+All task works on local system.
 """
 
 from fabric.api import task, puts, env, local, abort
@@ -28,7 +30,19 @@ import os
 
 @task
 def venv_pyuno_install():
-    """ Install Python OpenOffice binding """
+    """
+    Install Python OpenOffice binding
+
+    The tassk will try to locate ``uno.py`` and ``unohelper.py`` in ``/usr/``,
+    and copy it to your virtualenv's site-packages.
+
+    .. warning::
+      
+       The Python OpenOffice bindings from your system is specific to
+       your system's Python interpreter, hence if your system Python is 2.7 and 
+       you are installing the bindings into virtualenv with Python 2.4, the 
+       bindings will not work.
+    """
     pyver = python_version()
     ctx = {'pyver': pyver}
     ctx.update(env)
@@ -39,7 +53,11 @@ def venv_pyuno_install():
 
 @task
 def venv_requirements():
-    """ Install Python requirements """
+    """
+    Install Python packages
+    
+    The task will install Python packages defined in PIP requirements file.
+    """
     requirements = []
     for repo, info in env.CFG_INVENIO_REPOS:
         requirements.extend([(repo, x) for x in info.get('requirements', [])])
@@ -70,7 +88,16 @@ def venv_requirements():
 
 @task
 def venv_dump():
-    """ Archive a virtualenv """
+    """
+    Archive a virtualenv
+    
+    The task will create an archive ``<virtualenv name>.tar.gz`` of the entire
+    virtual environment. If an existing archive already exists, the user will
+    be asked for confirmation to remove it. Normally this command is invoked
+    indirectly via the compound task :meth:`inveniofab.compound.dump` which 
+    takes care of dumping the database prior to archiving the virtual 
+    environment.
+    """
     puts(cyan(">>> Creating archive of virutalenv in %(CFG_INVENIO_PREFIX)s..." % env))
 
     ctx = {
@@ -95,7 +122,15 @@ def venv_dump():
 
 @task
 def venv_load():
-    """ Load an archived virtualenv """
+    """
+    Load an archived virtualenv
+    
+    The task will extract an archived virtual environment created with 
+    :meth:`~venv_dump`. Normally this command is invoked
+    indirectly via the compound task :meth:`inveniofab.compound.load` which 
+    takes care of loading the database after extracting the virtual 
+    environment.
+    """
     puts(cyan(">>> Loading archived virutalenv..."))
 
     ctx = {
@@ -124,7 +159,23 @@ def venv_load():
 
 @task
 def venv_create():
-    """ Create virtualenv environment """
+    """
+    Create virtualenv environment
+    
+    The virtualenv is created in ``env.CFG_INVENIO_PREFIX``, and will also
+    create ``lib/python/invenio/`` and symlink it the virtualenv's 
+    site-packages, as well as ``var/tmp/ooffice-tmp-files`` (via sudo). If 
+    ``env.WITH_DEVSCRIPTS`` is ``True``, invenio-devscripts will be installed. 
+    If ``env.WITH_WORKDIR`` is ``True`` git-new-workdir will be installed.
+    
+    Lastly, it will append render the template ``activate-profile.tpl`` and
+    append it to ``bin/activate``. The script will setup common needed
+    environment variables that e.g. invenio-devscripts depend on.
+    
+    If an existing environment already exists, the user will be asked for
+    confirmation to remove the directory (using sudo, due to the directory
+    ``var/tmp/ooffice-tmp-files`` which is created using sudo).
+    """
     # Checks
     if 'CFG_INVENIO_PREFIX' not in env:
         abort(red("CFG_INVENIO_PREFIX is not specified in env.") % env)

@@ -20,7 +20,7 @@ Task for checking out source code from a repository, and running configure,
 make on it.
 """
 
-from fabric.api import task, puts, env, settings, local, abort
+from fabric.api import task, puts, env, settings, local, abort, hide
 from fabric.contrib.console import confirm
 from fabric.colors import cyan, red
 import os
@@ -121,7 +121,7 @@ def repo_update(**kwargs):
             ref = kwargs[repo]
             if not ref:
                 ref = None
-            repo_refs.append(repo, ref)
+            repo_refs.append((repo, ref))
             del kwargs[repo]
         else:
             try:
@@ -229,7 +229,19 @@ def git_newworkdir(repo):
         local("%(CFG_INVENIO_PREFIX)s/bin/git-new-workdir %(srcdir)s %(srcworkdir)s" % ctx)
 
 
+def git_isdirty(dir):
+    """
+    Check working directory for uncommitted changes
+    """
+    with settings(hide('everything'), warn_only=True):
+        output = local("cd %s && git diff-index --exit-code HEAD --" % dir, capture=True)
+    return output.return_code != 0
+
+
 def git_checkout(repo, ref):
+    """
+    Checkout a specific git reference.
+    """
     topsrcdir = repo_check(repo, workdir=True)
 
     ctx = {
@@ -238,8 +250,14 @@ def git_checkout(repo, ref):
     }
     ctx.update(env)
 
-    # Stash away any uncomitted changes
-    local("cd %(topsrcdir)s; if ! git diff-index --quiet HEAD --; then git stash; fi; git checkout -f %(ref)s" % ctx)
+    # Stash uncommited changes
+    if git_isdirty(topsrcdir):
+        if not confirm("Working directory %(topsrcdir)s contains uncommited changes. Do you want to stash the changes (required to continue)?" % ctx ):
+            abort("Cannot continue unless uncommitted changes are stashed")
+        else:
+            local("cd %(topsrcdir)s; git stash" % ctx)
+
+    local("cd %(topsrcdir)s; git checkout -f %(ref)s" % ctx)
 
 
 def git_clone(repo):

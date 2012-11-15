@@ -180,7 +180,7 @@ def venv_create():
     if 'CFG_INVENIO_PREFIX' not in env:
         abort(red("CFG_INVENIO_PREFIX is not specified in env.") % env)
 
-    puts(cyan(">>> Creating virutalenv in %(CFG_INVENIO_PREFIX)s..." % env))
+    puts(cyan(">>> Creating virtualenv in %(CFG_INVENIO_PREFIX)s..." % env))
 
     # Remove previous installation
     if os.path.exists(env.CFG_INVENIO_PREFIX):

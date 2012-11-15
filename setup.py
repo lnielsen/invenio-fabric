@@ -28,7 +28,7 @@ setup(
     install_requires=['distribute', 'Fabric>=1.4', 'Jinja2', 'virtualenvwrapper'],
     data_files=[
         ('share/atlantis/',[
-            'examples/atlantis/fabfile_advanced.py',
+            'examples/atlantis/fabfile.py',
             'examples/atlantis/fabfile_minimal.py',
         ]),
         ('share/atlantis/common/',[
@@ -36,6 +36,22 @@ setup(
             'examples/atlantis/common/requirements.txt',
             'examples/atlantis/common/requirements-extra.txt',
             'examples/atlantis/common/rundevserver.py.tpl',
+        ]),
+        ('share/openaire/',[
+            'examples/atlantis/fabfile.py',
+        ]),
+        ('share/openaire/common/',[
+            'examples/openaire/common/activate-profile.tpl',
+            'examples/openaire/common/config_local.py.tpl',
+            'examples/openaire/common/requirements.txt',
+            'examples/openaire/common/requirements-extra.txt',
+            'examples/openaire/common/rundevserver.py.tpl',
+        ]),
+        ('share/openaire/common/etc/',[
+            'examples/openaire/common/etc/invenio-local.conf',
+        ]),
+        ('share/openaire/int/etc/',[
+            'examples/openaire/int/etc/invenio-local.conf',
         ]),
     ],
 

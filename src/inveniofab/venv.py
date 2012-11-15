@@ -98,7 +98,7 @@ def venv_dump():
     takes care of dumping the database prior to archiving the virtual 
     environment.
     """
-    puts(cyan(">>> Creating archive of virutalenv in %(CFG_INVENIO_PREFIX)s..." % env))
+    puts(cyan(">>> Creating archive of virtualenv in %(CFG_INVENIO_PREFIX)s..." % env))
 
     ctx = {
         'dirname' : os.path.dirname(env.CFG_INVENIO_PREFIX),
@@ -131,7 +131,7 @@ def venv_load():
     takes care of loading the database after extracting the virtual 
     environment.
     """
-    puts(cyan(">>> Loading archived virutalenv..."))
+    puts(cyan(">>> Loading archived virtualenv..."))
 
     ctx = {
         'dirname' : os.path.dirname(env.CFG_INVENIO_PREFIX),
@@ -230,7 +230,7 @@ def venv_drop():
     if 'CFG_INVENIO_PREFIX' not in env:
         abort(red("CFG_INVENIO_PREFIX is not specified in env.") % env)
 
-    puts(cyan(">>> Dropping virutalenv in %(CFG_INVENIO_PREFIX)s..." % env))
+    puts(cyan(">>> Dropping virtualenv in %(CFG_INVENIO_PREFIX)s..." % env))
 
     # Remove previous installation
     if os.path.exists(env.CFG_INVENIO_PREFIX):

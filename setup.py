@@ -25,7 +25,7 @@ setup(
     package_dir={'': 'src'},
     include_package_data=False,
     zip_safe=False,
-    install_requires=['distribute', 'Fabric>=1.4', 'Jinja2', 'virtualenvwrapper'],
+    install_requires=['distribute', 'Fabric>=1.4', 'Jinja2', 'virtualenvwrapper','Sphinx'],
     data_files=[
         ('share/atlantis/',[
             'examples/atlantis/fabfile.py',

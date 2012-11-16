@@ -308,7 +308,6 @@ def _run_hook(repo, hook_name, default_hook, *args, **kwargs):
     hook.
     """
     try:
-        print dict(env.CFG_INVENIO_REPOS)[repo]
         hook = dict(env.CFG_INVENIO_REPOS)[repo][hook_name]
     except KeyError:
         hook = default_hook

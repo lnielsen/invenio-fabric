@@ -379,6 +379,8 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
             'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', ],
             'deploy_targets': ['all', 'check-upgrade', 'install', ],
             'requirements': ['requirements.txt', 'requirements-extra.txt', ],
+            #'configure_hook': None, # Can be specified if you want to override default behaviour (./configure --with-prefix=.. --with-python=..)
+            #'prepare_hook': None, # Can be specified if you want to override default behaviour  (aclocal && autoconf && automake)
         }),
     ]
 

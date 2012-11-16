@@ -15,7 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
-from fabric.api import prompt, env, local
+from fabric.api import prompt, env, local, abort, warn
+from fabric.colors import red
 from jinja2 import Environment, FileSystemLoader
 from jinja2.exceptions import TemplateNotFound
 import getpass
@@ -130,3 +131,22 @@ def pythonbrew_versions():
             version_dict["%s%s" % (major, minor)] = pybin
 
     return version_dict
+
+
+def template_hook_factory(tpl_file, filename, warn_only=True):
+    """
+    Factory method for generating hook functions that renders a template,
+    and writes it to a specific location.
+    
+    Filename may include string replacement like e.g. %(CFG_INVENIO_PREFIX)s.
+    """
+    def write_template_hook(ctx):
+        try:
+            write_template(filename % ctx, ctx, tpl_file=tpl_file)
+        except TemplateNotFound, e:
+            if warn_only:
+                warn(red("Couldn't find template %s" % tpl_file))
+            else:
+                abort(red("Couldn't find template %s" % tpl_file))
+
+    return write_template_hook

@@ -30,6 +30,7 @@ from fabric.api import task, abort, puts, local, roles, sudo, cd, execute
 from fabric.colors import cyan
 from fabric.contrib.console import confirm
 from inveniofab.api import *
+from inveniofab.utils import template_hook_factory
 from jinja2.exceptions import TemplateNotFound
 import os
 
@@ -114,7 +115,9 @@ def loc(activate=True, py=None, ref=None, invenio='master', **kwargs):
             'ref': ref or 'maint',
             'bootstrap_targets': ['all', 'install', ],
             'deploy_targets': ['all', 'install', ],
-            'requirements' : ['%(CFG_OPENAIRE_SRCDIR)s/requirements.txt']
+            'requirements' : ['%(CFG_OPENAIRE_SRCDIR)s/requirements.txt'],
+            #'configure_hook': template_hook_factory('config-local.mk','%(topsrcdir)s/config-local.mk'),
+            #'prepare_hook': None, # Don't run any hook on prepare
         }),
     ]
 

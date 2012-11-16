@@ -25,6 +25,10 @@ from fabric.contrib.console import confirm
 from fabric.colors import cyan, red
 import os
 
+#
+# Tasks
+#
+
 @task
 def repo_configure(repo):
     """ Configure repository """
@@ -37,12 +41,7 @@ def repo_configure(repo):
     }
     ctx.update(env)
 
-    if os.path.exists(os.path.join(topsrcdir, "configure")):
-        with settings(warn_only=True):
-            local("cd %(topsrcdir)s && make -s clean" % ctx)
-    local("cd %(topsrcdir)s && ./configure --prefix=%(CFG_INVENIO_PREFIX)s "
-          "--with-python=%(CFG_INVENIO_PREFIX)s/bin/python" % ctx)
-    local("cd %(topsrcdir)s && make -s clean" % ctx)
+    _run_hook(repo, 'configure_hook', default_configure_hook, ctx)
 
 
 @task
@@ -77,7 +76,11 @@ def repo_install(repo=None, targets_key='install_targets'):
 def repo_prepare(repo=None):
     """ Prepare source code after fresh checkout """
     topsrcdir = repo_check(repo, workdir=True)
-    local("cd %s; aclocal && automake -a && autoconf -f" % topsrcdir)
+
+    ctx = {'topsrcdir': topsrcdir}
+    ctx.update(env)
+
+    _run_hook(repo, 'prepare_hook', default_prepare_hook, ctx)
 
 
 @task
@@ -294,3 +297,46 @@ def git_clone(repo):
 def git_fetch(repo):
     topsrcdir = repo_check(repo)
     local("cd %s; git fetch origin" % topsrcdir)
+
+
+#
+# Helpers
+#
+def _run_hook(repo, hook_name, default_hook, *args, **kwargs):
+    """
+    Execute a hook for a given repository. If no hook exists, run the default
+    hook.
+    """
+    try:
+        print dict(env.CFG_INVENIO_REPOS)[repo]
+        hook = dict(env.CFG_INVENIO_REPOS)[repo][hook_name]
+    except KeyError:
+        hook = default_hook
+
+    if hook:
+        puts(">>> Running hook %s" % hook.__name__)
+        hook(*args, **kwargs)
+    else:
+        puts(">>> No hook found for %s" % hook_name)
+
+#
+# Built-in hooks
+#
+def default_configure_hook(ctx):
+    """
+    Default way to configure a repo. Assumes repo has a configure script.
+    """
+    if os.path.exists(os.path.join(ctx['topsrcdir'], "configure")):
+        with settings(warn_only=True):
+            local("cd %(topsrcdir)s && make -s clean" % ctx)
+    local("cd %(topsrcdir)s && ./configure --prefix=%(CFG_INVENIO_PREFIX)s "
+          "--with-python=%(CFG_INVENIO_PREFIX)s/bin/python" % ctx)
+    local("cd %(topsrcdir)s && make -s clean" % ctx)
+
+
+def default_prepare_hook(ctx):
+    """
+    Default way to prepare source code which uses autotools.
+    """
+    if os.path.exists(os.path.join(ctx['topsrcdir'], "configure.ac")):
+        local("cd %(topsrcdir)s; aclocal && automake -a && autoconf -f" % ctx)

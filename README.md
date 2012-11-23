@@ -14,6 +14,8 @@ Optional:
 
 *Important:* Invenio Fabric requires you to already have system dependencies installed (e.g. OpenOffice etc). Please see http://invenio-software.org/wiki/Installation or e.g. https://github.com/lnielsen-cern/invenio-vagrant/blob/master/provision-ubuntu.sh for how to install system dependencies on your system.
 
+*Python 2.4:* If you are planning to use Pythonbrew with Python 2.4, you must install virtualenv 1.7.2 (or lower), as virtualenv 1.8 dropped support for Python 2.4.
+
 Requirements
 ============
 

@@ -15,15 +15,15 @@
 
 
 """
-Fabric tasks for bootstrapping, installing, deploying and running OpenAIRE.
+Fabric tasks for bootstrapping, installing, deploying and running INSPIRE.
 
 Examples
 --------
-Bootstrap OpenAIRE with Python 2.4 and copy production data
-  fab loc:py=24 bootstrap openaire_fixture_load
+Bootstrap INSPIRE with Python 2.6
+  fab loc:py=26 bootstrap
 
 Configure OpenAIRE repository to use with environment
-  fab loc:py=24,ref=master repo_configure:openaire
+  fab loc:py=26,ref=master repo_configure:inspire
 """
 
 from fabric.api import task, puts, local
@@ -45,6 +45,7 @@ def loc(activate=True, py=None, ref=None, invenio='master', **kwargs):
     env.WITH_WORKDIR = False
     env.CFG_SRCWORKDIR = env.CFG_SRCDIR
 
+    # FIXME: Should probably be generalized via hooks in the bootstrap task instead.
     # Adds specific inspire steps to, e.g bootstrap task
     env.CFG_INSPIRE_SITE = 1
 
@@ -56,15 +57,15 @@ def loc(activate=True, py=None, ref=None, invenio='master', **kwargs):
 
     env.CFG_INVENIO_REPOS = [
         ('invenio-inspire-ops', {
-            'repository': 'ssh://jmartinm@lxplus.cern.ch/afs/cern.ch/project/inspire/repo/invenio-inspire-ops.git',
-            'ref': 'origin/prod',
+            'repository': 'ssh://%(user)s@lxplus.cern.ch/afs/cern.ch/project/inspire/repo/invenio-inspire-ops.git' % env,
+            'ref': 'prod',
             'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', ],
             'deploy_targets': ['all', 'install', ],
             'requirements': ['requirements.txt', 'requirements-extra.txt']
         }),
         ('inspire', {
-            'repository': 'ssh://jmartinm@lxplus.cern.ch/afs/cern.ch/user/s/simko/public/repo/inspire.git',
-            'ref': 'origin/master',
+            'repository': 'ssh://%(user)s@lxplus.cern.ch/afs/cern.ch/user/s/simko/public/repo/inspire.git' % env,
+            'ref': 'master',
             'bootstrap_targets': ['install', ],
             'deploy_targets': ['install', ],
             'configure_hook': template_hook_factory('config-local.mk', '%(topsrcdir)s/config-local.mk'),

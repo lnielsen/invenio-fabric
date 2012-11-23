@@ -4,6 +4,8 @@ Invenio Fabric AUTHORS and CONTRIBUTORS
  * Lars Holm Nielsen <lars.holm.nielsen@cern.ch>
  * Jirí Kuncar <jkuncar@cern.ch>
  * Jay Luker <lbjay@reallywow.com>
+ * Javier Martin Montull <javier.martin.montull@cern.ch>
+
 
 # Run:
 # git log | grep "^Author:" | sort | uniq | sed s/Author:\ //

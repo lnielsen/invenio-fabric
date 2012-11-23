@@ -15,15 +15,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
-from fabric.api import task, puts, local
-from fabric.colors import cyan
-from inveniofab.api import *
+# FIXME: Move to fabfile.py for INSPIRE?
 
+from fabric.api import task, puts, local, env
+from fabric.colors import cyan
+from inveniofab.git import repo_check
 
 @task
 def inspire_dbchanges():
     """ Perform INSPIRE db changes """
-    from fabric.api import env
     puts(cyan(">>> Updating tables from INSPIRE..." % env))
 
     ctx = {

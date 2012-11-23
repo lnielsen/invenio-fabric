@@ -20,7 +20,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='invenio-fabric',
-    version='0.2.4',
+    version='0.2.5',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=False,
@@ -38,7 +38,7 @@ setup(
             'examples/atlantis/common/rundevserver.py.tpl',
         ]),
         ('share/openaire/',[
-            'examples/atlantis/fabfile.py',
+            'examples/openaire/fabfile.py',
         ]),
         ('share/openaire/common/',[
             'examples/openaire/common/activate-profile.tpl',
@@ -53,10 +53,24 @@ setup(
         ('share/openaire/int/etc/',[
             'examples/openaire/int/etc/invenio-local.conf',
         ]),
+        ('share/inspire/',[
+            'examples/inspire/fabfile.py',
+        ]),
+        ('share/inspire/common/',[
+            'examples/inspire/common/activate-profile.tpl',
+            'examples/inspire/common/config_local.py.tpl',
+            'examples/inspire/common/config-local.mk',
+            'examples/inspire/common/requirements.txt',
+            'examples/inspire/common/requirements-extra.txt',
+            'examples/inspire/common/rundevserver.py.tpl',
+        ]),
+        ('share/inspire/common/etc/',[
+            'examples/inspire/common/etc/invenio-local.conf',
+        ]),
     ],
 
     author='CERN',
-    author_email='lars.holm.nielsen@cern.ch',
+    author_email='info@invenio-software.org',
     description='Fabric tasks for working with Invenio repository software',
     license="GPL",
     keywords="invenio fabric CERN",

@@ -30,6 +30,7 @@ from inveniofab.mysql import mysql_createdb, mysql_dump, mysql_load, \
     mysql_dropdb
 from inveniofab.venv import venv_create, venv_requirements, venv_dump, \
     venv_load, venv_drop
+# FIXME: See note in bootstrap() method regarding inspire_dbchanges
 from inveniofab.inspire import inspire_dbchanges
 
 
@@ -73,6 +74,9 @@ def bootstrap(with_db=True, quite=False, **kwargs):
         _confirm_step(devserver_conf)
     if with_db:
         _confirm_step(invenio_createdb)
+    # FIXME: Generalize below to have hooks in the bootstrap process, which can be
+    # customized for each individual overlay (e.g. OpenAIRE/INSPIRE needs to create
+    # extra tables etc., load demo records?)
     if env.CFG_INSPIRE_SITE:
         _confirm_step(inspire_dbchanges)
 

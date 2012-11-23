@@ -30,6 +30,7 @@ from inveniofab.mysql import mysql_createdb, mysql_dump, mysql_load, \
     mysql_dropdb
 from inveniofab.venv import venv_create, venv_requirements, venv_dump, \
     venv_load, venv_drop
+from inveniofab.inspire import inspire_dbchanges
 
 
 @task
@@ -72,6 +73,8 @@ def bootstrap(with_db=True, quite=False, **kwargs):
         _confirm_step(devserver_conf)
     if with_db:
         _confirm_step(invenio_createdb)
+    if env.CFG_INSPIRE_SITE:
+        _confirm_step(inspire_dbchanges)
 
 
 @task

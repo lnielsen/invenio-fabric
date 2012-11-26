@@ -370,6 +370,10 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
         # FIXME: Set to localhost or leave empty?
         'CFG_MISCUTIL_SMTP_HOST': '127.0.0.1',
         'CFG_MISCUTIL_SMTP_PORT': '1025',
+
+        # FIXME: Should be removed, so Inspire stuff is not integrated in main
+        # source file.
+        'CFG_INSPIRE_SITE' : False,
     })
 
     env.CFG_INVENIO_REPOS = [

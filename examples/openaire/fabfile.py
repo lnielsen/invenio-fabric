@@ -98,9 +98,9 @@ def loc(activate=True, py=None, ref=None, invenio='master', **kwargs):
     # Do not use git-new-workdir
     env.WITH_WORKDIR = False
     env.CFG_SRCWORKDIR = env.CFG_SRCDIR
-    
+
     # Setup Invenio/OpenAIRE source directories (works just as short-cuts)
-    # Their path must match CFG_SRCDIR/<reponame> where <reponame> is defined 
+    # Their path must match CFG_SRCDIR/<reponame> where <reponame> is defined
     # in CFG_INVENIO_REPOS.
     env.CFG_INVENIO_SRCDIR = os.path.join(env.CFG_SRCDIR, 'invenio')
     env.CFG_OPENAIRE_SRCDIR = os.path.join(env.CFG_SRCDIR, 'openaire')

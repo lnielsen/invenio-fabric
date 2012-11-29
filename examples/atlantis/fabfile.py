@@ -48,4 +48,4 @@ def loc(activate=True, py=None, ref=None, **kwargs):
 
     env = env_create('loc', activate=activate, python=py, **kwargs)
 
-    return env_override(env, 'invenio', ref)
+    return env_override(env, 'invenio', ref, {'ref' : ref})

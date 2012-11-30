@@ -22,7 +22,7 @@ Examples
 Bootstrap INSPIRE with Python 2.6
   fab loc:py=26 bootstrap
 
-Configure OpenAIRE repository to use with environment
+Configure INSPIRE repository to use with environment
   fab loc:py=26,ref=master repo_configure:inspire
 """
 
@@ -38,7 +38,7 @@ def loc(activate=True, py=None, ref=None, invenio='master', **kwargs):
     """
     Local environment (example: loc:py=24,ref=master)
     """
-    env = env_create('loc', name=env_make_name('inspireprod', py or '', ref or ''),
+    env = env_create('loc', name=env_make_name('inspireinvenio', py or '', ref or ''),
                      activate=activate, python=py, **kwargs)
 
     # Do not use git-new-workdir
@@ -52,22 +52,16 @@ def loc(activate=True, py=None, ref=None, invenio='master', **kwargs):
     # Setup Invenio/INSPIRE source directories (works just as short-cuts)
     # Their path must match CFG_SRCDIR/<reponame> where <reponame> is defined
     # in CFG_INVENIO_REPOS.
-    env.CFG_INVENIO_SRCDIR = os.path.join(env.CFG_SRCDIR, 'invenio-inspire-ops')
+    env.CFG_INVENIO_SRCDIR = os.path.join(env.CFG_SRCDIR, 'invenio')
     env.CFG_INSPIRE_SRCDIR = os.path.join(env.CFG_SRCDIR, 'inspire')
 
-    env.CFG_INVENIO_REPOS = [
-        ('invenio-inspire-ops', {
-            'repository': 'ssh://%(user)s@lxplus.cern.ch/afs/cern.ch/project/inspire/repo/invenio-inspire-ops.git' % env,
-            'ref': 'prod',
-            'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', ],
-            'deploy_targets': ['all', 'install', ],
-            'requirements': ['requirements.txt', 'requirements-extra.txt']
-        }),
+    env.CFG_INVENIO_REPOS += [
         ('inspire', {
-            'repository': 'ssh://%(user)s@lxplus.cern.ch/afs/cern.ch/user/s/simko/public/repo/inspire.git' % env,
+            'repository': 'http://invenio-software.org/repo/inspire',
             'ref': 'master',
             'bootstrap_targets': ['install', ],
             'deploy_targets': ['install', ],
+            'requirements': ['requirements.txt', 'requirements-extra.txt'],
             'configure_hook': template_hook_factory('config-local.mk', '%(topsrcdir)s/config-local.mk'),
             'prepare_hook': None
         }),
@@ -75,7 +69,7 @@ def loc(activate=True, py=None, ref=None, invenio='master', **kwargs):
 
     env.CFG_DATABASE_HOST = 'localhost'
     env.CFG_DATABASE_PORT = 3306
-    env.CFG_INVENIO_ADMIN = 'javier.martin.montull@cern.ch'
+    env.CFG_INVENIO_ADMIN = 'youremailaddress@cern.ch'
 
     # If no database or username is specified a new database with the same
     # name as the virtualenv will be created. Also a user with the env username
@@ -90,6 +84,17 @@ def loc(activate=True, py=None, ref=None, invenio='master', **kwargs):
 # =======================
 # INSPIRE specific tasks
 # =======================
+@task
+def inspire_bibsched_tasks():
+    """ Add common periodical tasks to BibSched """
+    from fabric.api import env
+    puts(cyan(
+        ">>> Running bibindex, bibrank, bibreformat and webcoll..." % env))
+    local('%(CFG_INVENIO_PREFIX)s/bin/bibindex -f50000 -s5m -u admin' % env)
+    local('%(CFG_INVENIO_PREFIX)s/bin/bibrank -f50000 -s5m -u admin' % env)
+    local('%(CFG_INVENIO_PREFIX)s/bin/bibreformat -s5m -u admin' % env)
+    local('%(CFG_INVENIO_PREFIX)s/bin/webcoll -s5m -u admin' % env)
+
 @task
 def inspire_dbchanges():
     """ Perform INSPIRE db changes """

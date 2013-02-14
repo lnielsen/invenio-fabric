@@ -169,12 +169,12 @@ Many variables map directly to their Invenio counterpart - e.g.
 ``CFG_DATABASE_NAME`` can be defined in invenio-local.conf as well as in
 Invenio Fabric ``env.CFG_DATABASE_NAME``.
 
-Usually when deploying or working with a specific Invenio project, some 
+Usually when deploying or working with a specific Invenio project, some
 configuration variables depend only on the project (e.g. 
 ``CFG_WEBSTYLE_TEMPLATE_SKIN``), while others depend
 on the deployment environment (e.g. ``CFG_DATABASE_HOST``).
 
-As a general rule, project-wide configuration should go in a common 
+As a general rule, project-wide configuration should go in a common
 ``invenio-local.conf`` template, while deployment dependent configuration should
 be defined in a Fabric environment task. The ``invenio-local.conf`` can then be
 render with the Fabric env variables.
@@ -192,25 +192,25 @@ import copy
 import os
 
 GLOBAL_REFS_OVERRIDE = {
-    'invenio' : {
-        'next' : {
+    'invenio': {
+        'next': {
             'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin',
                 'install-ckeditor-plugin', 'install-pdfa-helper-files',
                 'install-jquery-plugins', 'install-jquery-tokeninput',
-                'install-bootstrap' ],
+                'install-bootstrap'],
             'deploy_targets': ['all', 'check-upgrade', 'install', ],
-            'requirements' : ['%(CFG_INVENIO_SRCDIR)s/requirements.txt',
+            'requirements': ['%(CFG_INVENIO_SRCDIR)s/requirements.txt',
                 '%(CFG_INVENIO_SRCDIR)s/requirements-extras.txt',
                 '%(CFG_INVENIO_SRCDIR)s/requirements-flask.txt',
-                '%(CFG_INVENIO_SRCDIR)s/requirements-flask-ext.txt',],
+                '%(CFG_INVENIO_SRCDIR)s/requirements-flask-ext.txt', ],
         },
-        'origin/v0.99.0' : {
-            'bootstrap_targets' : ['all', 'install'],
-            'deploy_targets' : ['all', 'install'],
+        'origin/v0.99.0': {
+            'bootstrap_targets': ['all', 'install'],
+            'deploy_targets': ['all', 'install'],
         },
-        'origin/v0.99.5' : {
-            'bootstrap_targets' : ['all', 'install'],
-            'deploy_targets' : ['all', 'install'],
+        'origin/v0.99.5': {
+            'bootstrap_targets': ['all', 'install'],
+            'deploy_targets': ['all', 'install'],
         },
     },
 }
@@ -225,12 +225,12 @@ match the default. This dictionary allows you to override the default values.
 def env_create(envname, defaults_func=None, activate=True, **kwargs):
     """
     Setup a new environment (e.g. integration, production, local).
-    
+
     See module documentation above for detailed explanation of enviroments.
-    
+
     :param envname: str, Name of environment (must be same as task envname).
     :param defaults_func: callable taking a dictionary as argument and returns
-        the same dictionary. Used to setup defaults in the environment. By 
+        the same dictionary. Used to setup defaults in the environment. By
         default the :meth:`~env_defaults` is used. Take great care if overriding
         this, since many tasks expects specific variables to be defined.
     :param activate: True to activate the environment, or False to just
@@ -268,9 +268,9 @@ def env_get(name):
     An environment is defined in a local task. This task will
     look for a task with the name <name> and execute. Hence
     the task defining the environment.
-    
+
     Example::
-    
+
         from fabric.api import env
 
         @task
@@ -279,7 +279,7 @@ def env_get(name):
             print env.CFG_SITE_URL
             print another_env.CFG_SITE_URL
 
-    Running ``fab int sometask`` would print first the integration 
+    Running ``fab int sometask`` would print first the integration
     ``CFG_SITE_URL``, then the production ``CFG_SITE_URL``.
     """
     from fabric.api import env
@@ -304,13 +304,13 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
     Setup defaults in environment.
 
     The method will by default try to guess
-    
+
     :param name:
     :param prefix:
     :param python:
 
     .. note:
-    
+
        This can be overridden by the user, though it is not recommended.
     """
     # Initialise template loader
@@ -347,17 +347,19 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
         'CFG_INVENIO_REPOS': [],
         'CFG_INVENIO_CONF': 'etc/invenio-local.conf',
         'CFG_INVENIO_PREFIX': prefix,
-        'CFG_INVENIO_SRCDIR' : os.path.join(prefix, 'src/invenio'),
-        'CFG_SRCDIR' : os.environ.get('CFG_SRCDIR', os.path.join(prefix, 'src')),
+        'CFG_INVENIO_SRCDIR': os.path.join(prefix, 'src/invenio'),
+        'CFG_SRCDIR': os.environ.get('CFG_SRCDIR', os.path.join(prefix, 'src')),
         # Only use CFG_SRCWORKDIR if WITH_WORKDIR is True
-        'CFG_SRCWORKDIR' : os.path.join(prefix, 'src'),
+        'CFG_SRCWORKDIR': os.path.join(prefix, 'src'),
         'CFG_INVENIO_HOSTNAME': "localhost",
         'CFG_INVENIO_DOMAINNAME': "",
         'CFG_INVENIO_PORT_HTTP': "4000",
         'CFG_INVENIO_PORT_HTTPS': "4000",
         'CFG_INVENIO_USER': env.user,
-        'CFG_INVENIO_APACHECTL': '/etc/init.d/httpd',
         'CFG_INVENIO_ADMIN': 'nobody@localhost',
+
+        'CFG_INVENIO_APACHECTL': '/etc/init.d/httpd',
+        'CFG_APACHE_CONF': '/etc/httpd/conf/httpd.conf',
 
         'CFG_DATABASE_DUMPDIR': prefix,
         'CFG_DATABASE_HOST': 'localhost',
@@ -373,12 +375,12 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
 
         # FIXME: Should be removed, so Inspire stuff is not integrated in main
         # source file.
-        'CFG_INSPIRE_SITE' : False,
+        'CFG_INSPIRE_SITE': False,
     })
 
     env.CFG_INVENIO_REPOS = [
         ('invenio', {
-            'repository' : 'http://invenio-software.org/repo/invenio/',
+            'repository': 'http://invenio-software.org/repo/invenio/',
             'ref': 'master',
             'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', ],
             'deploy_targets': ['all', 'check-upgrade', 'install', ],
@@ -391,7 +393,7 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
     return env
 
 
-def env_override(env, this_repo, this_ref, override={}, global_overrides=None ):
+def env_override(env, this_repo, this_ref, override={}, global_overrides=None):
     """ Override default values for repository """
     if global_overrides:
         try:
@@ -423,10 +425,10 @@ def env_override(env, this_repo, this_ref, override={}, global_overrides=None ):
 def env_make_name(prefix, python, ref):
     """ Generate a MySQL friendly environment name. """
     ref = ref.split("/")
-    ref = ref[-1].replace("-","_")
-    python = python.replace(".","")
-    
-    prefix = prefix.replace("_","").replace("-","")
+    ref = ref[-1].replace("-", "_")
+    python = python.replace(".", "")
+
+    prefix = prefix.replace("_", "").replace("-", "")
 
     name = "%s%s%s" % (prefix, python, ref)
     if len(name) > 16:

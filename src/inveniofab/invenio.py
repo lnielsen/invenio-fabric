@@ -16,10 +16,10 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 import os
-from fabric.api import local, puts, env, task, abort, warn
+from fabric.api import puts, env, task, abort, roles
 from fabric.colors import red, cyan
 from fabric.contrib.console import confirm
-from inveniofab.utils import write_template
+from inveniofab.utils import write_template, sudo_local
 from jinja2.exceptions import TemplateNotFound
 
 #
@@ -54,6 +54,7 @@ CFG_FLASK_CACHE_TYPE = redis
 
 
 @task
+@roles('web')
 def invenio_conf():
     """ Upload and update Invenio configuration """
     puts(cyan(">>> Configuring Invenio..." % env))
@@ -66,21 +67,22 @@ def invenio_conf():
 
     puts(">>> Writing invenio-local.conf to %s ..." % invenio_local_remote)
     if not invenio_local:
-        write_template(invenio_local_remote, env, tpl_str=INVENIO_LOCAL_TPL)
+        write_template(invenio_local_remote, env, tpl_str=INVENIO_LOCAL_TPL, use_sudo=True)
     else:
         try:
-            write_template(invenio_local_remote, env, tpl_file=invenio_local)
+            write_template(invenio_local_remote, env, tpl_file=invenio_local, use_sudo=True)
         except TemplateNotFound:
             puts(red("Could not find template %s" % invenio_local))
             if not confirm("Use built-in template for invenio-local.conf?"):
                 abort("User aborted")
             else:
-                write_template(invenio_local_remote, env, tpl_str=INVENIO_LOCAL_TPL)
+                write_template(invenio_local_remote, env, tpl_str=INVENIO_LOCAL_TPL, use_sudo=True)
 
     inveniocfg("--update-all")
 
 
 @task
+@roles('web')
 def invenio_upgrade():
     """ Upgrade Invenio """
     puts(cyan(">>> Upgrading Invenio..." % env))
@@ -88,6 +90,7 @@ def invenio_upgrade():
 
 
 @task
+@roles('web')
 def invenio_createdb():
     """ Create Invenio tables """
     puts(cyan(">>> Creating Invenio tables..." % env))
@@ -95,6 +98,7 @@ def invenio_createdb():
 
 
 @task
+@roles('web')
 def invenio_create_demosite():
     """ Create Invenio demo site"""
     puts(cyan(">>> Creating Invenio demo site..." % env))
@@ -109,4 +113,4 @@ def inveniocfg(options):
     Helper to run inveniocfg
     """
     #cmds = " && ".join([]) % env
-    local(("%(CFG_INVENIO_PREFIX)s/bin/inveniocfg " % env) + options)
+    sudo_local(("%(CFG_INVENIO_PREFIX)s/bin/inveniocfg " % env) + options, user=env.CFG_INVENIO_USER)

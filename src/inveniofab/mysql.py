@@ -20,12 +20,13 @@ Library tasks for configuring and running MySQL for Invenio.
 """
 
 from __future__ import with_statement
-from fabric.api import puts, task, env, local, abort, settings, hide
+from fabric.api import puts, task, env, local, abort, settings, hide, roles
 from fabric.colors import red, cyan
 from fabric.contrib.console import confirm
 from inveniofab.env import env_get
-from inveniofab.utils import prompt_and_check
+from inveniofab.utils import prompt_and_check, exists_local, sudo_local
 import os
+
 
 @task
 def mysql_dropdb(stored_answers=None):
@@ -49,9 +50,9 @@ def mysql_dropdb(stored_answers=None):
         ctx = {
             'user_pw': user_pw,
             'host': env.CFG_DATABASE_HOST,
-            'name' :  env.CFG_DATABASE_NAME,
-            'user' :  env.CFG_DATABASE_USER,
-            'password' : env.CFG_DATABASE_PASS,
+            'name':  env.CFG_DATABASE_NAME,
+            'user':  env.CFG_DATABASE_USER,
+            'password': env.CFG_DATABASE_PASS,
             'port': env.CFG_DATABASE_PORT,
         }
 
@@ -59,7 +60,7 @@ def mysql_dropdb(stored_answers=None):
 
         local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "DROP DATABASE IF EXISTS %(name)s"' % ctx)
         with settings(warn_only=True):
-            local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "REVOKE ALL PRIVILEGES ON %(name)s.* FROM %(user)s@localhost"' % ctx)
+            local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "REVOKE ALL PRIVILEGES ON %(name)s.* FROM %(user)s@\'%%.cern.ch\'"' % ctx)
         local('mysqladmin %(user_pw)s -h %(host)s -P %(port)s flush-privileges' % ctx)
 
 
@@ -84,10 +85,10 @@ def mysql_createdb(stored_answers=None):
 
         ctx = {
             'user_pw': user_pw,
-            'host' :  env.CFG_DATABASE_HOST,
-            'name' :  env.CFG_DATABASE_NAME,
-            'user' :  env.CFG_DATABASE_USER,
-            'password' : env.CFG_DATABASE_PASS,
+            'host':  env.CFG_DATABASE_HOST,
+            'name':  env.CFG_DATABASE_NAME,
+            'user':  env.CFG_DATABASE_USER,
+            'password': env.CFG_DATABASE_PASS,
             'port': env.CFG_DATABASE_PORT,
         }
 
@@ -95,11 +96,12 @@ def mysql_createdb(stored_answers=None):
 
         # Run commands
         local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "CREATE DATABASE IF NOT EXISTS %(name)s DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci"' % ctx)
-        local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "GRANT ALL PRIVILEGES ON %(name)s.* TO %(user)s@localhost IDENTIFIED BY \'%(password)s\';"' % ctx)
+        local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "GRANT ALL PRIVILEGES ON %(name)s.* TO %(user)s@\'%%.cern.ch\' IDENTIFIED BY \'%(password)s\';"' % ctx)
         local('mysqladmin %(user_pw)s -h %(host)s -P %(port)s flush-privileges' % ctx)
 
 
 @task
+@roles('web')
 def mysql_dump(outputdir=None):
     """
     Dump database to file
@@ -108,8 +110,8 @@ def mysql_dump(outputdir=None):
         puts(cyan(">>> Dumping database ..." % env))
 
         answers = {
-            'user' : env.CFG_DATABASE_USER,
-            'password' : env.CFG_DATABASE_PASS,
+            'user': env.CFG_DATABASE_USER,
+            'password': env.CFG_DATABASE_PASS,
         }
 
         # Escape quote characters
@@ -118,7 +120,7 @@ def mysql_dump(outputdir=None):
         if not outputdir:
             outputdir = env.CFG_DATABASE_DUMPDIR
 
-        if not os.path.exists(outputdir):
+        if not exists_local(outputdir):
             abort(red("Output directory %s does not exists" % outputdir))
 
         user_pw = '-u %(user)s --password=%(password)s' % answers if answers['password'] else '-u %(user)s' % answers
@@ -126,27 +128,27 @@ def mysql_dump(outputdir=None):
         outfile_gz = "%s.gz" % outfile
 
         for f in [outfile, outfile_gz]:
-            if os.path.exists(f):
+            if exists_local(f):
                 res = confirm("Remove existing DB dump in %s ?" % f)
                 if not res:
                     abort(red("Cannot continue") % env)
                 else:
-                    local("rm -Rf %s" % f)
+                    sudo_local("rm -Rf %s" % f)
 
         ctx = {
             'user_pw': user_pw,
-            'host' :  env.CFG_DATABASE_HOST,
-            'name' :  env.CFG_DATABASE_NAME,
+            'host':  env.CFG_DATABASE_HOST,
+            'name':  env.CFG_DATABASE_NAME,
             'port': env.CFG_DATABASE_PORT,
             'outfile_gz': outfile_gz,
             'outfile': outfile,
         }
 
         # Run commands
-        local('mysqldump %(user_pw)s -h %(host)s -P %(port)s --skip-opt '
+        sudo_local('mysqldump %(user_pw)s -h %(host)s -P %(port)s --skip-opt '
               '--add-drop-table --add-locks --create-options --quick '
               '--extended-insert --set-charset --disable-keys %(name)s '
-              '| gzip -c > %(outfile_gz)s' % ctx)
+              '| gzip -c > %(outfile_gz)s' % ctx, user=env.CFG_INVENIO_USER)
 
 
 @task
@@ -160,7 +162,7 @@ def mysql_load(dumpfile=None, stored_answers=None):
         if not dumpfile:
             dumpfile = os.path.join(env.CFG_DATABASE_DUMPDIR, "%s.sql.gz" % env.CFG_DATABASE_NAME)
 
-        if not os.path.exists(dumpfile):
+        if not exists_local(dumpfile):
             abort("File %s does not exists." % dumpfile)
 
         answers = prompt_and_check([
@@ -181,10 +183,10 @@ def mysql_load(dumpfile=None, stored_answers=None):
 
         ctx = {
             'user_pw': user_pw,
-            'host' :  env.CFG_DATABASE_HOST,
-            'name' :  env.CFG_DATABASE_NAME,
-            'user' :  env.CFG_DATABASE_USER,
-            'password' : env.CFG_DATABASE_PASS,
+            'host':  env.CFG_DATABASE_HOST,
+            'name':  env.CFG_DATABASE_NAME,
+            'user':  env.CFG_DATABASE_USER,
+            'password': env.CFG_DATABASE_PASS,
             'port': env.CFG_DATABASE_PORT,
             'dumpfile': dumpfile,
             'dumpfile_stream': dumpfile_stream,
@@ -197,7 +199,7 @@ def mysql_load(dumpfile=None, stored_answers=None):
             mysql_dropdb(stored_answers=answers)
             mysql_createdb(stored_answers=answers)
 
-            local('%(dumpfile_stream)s | mysql %(user_pw)s -h %(host)s -P %(port)s -f %(name)s' % ctx)
+            sudo_local('%(dumpfile_stream)s | mysql %(user_pw)s -h %(host)s -P %(port)s -f %(name)s' % ctx, user=env.CFG_INVENIO_USER)
 
         return dumpfile
 

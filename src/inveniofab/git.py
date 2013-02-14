@@ -20,16 +20,18 @@ Task for checking out source code from a repository, and running configure,
 make on it.
 """
 
-from fabric.api import task, puts, env, settings, local, abort, hide
+from fabric.api import task, puts, env, settings, abort, hide, roles
 from fabric.contrib.console import confirm
 from fabric.colors import cyan, red
+from inveniofab.utils import exists_local, sudo_local
 import os
+
 
 #
 # Tasks
 #
-
 @task
+@roles('web')
 def repo_configure(repo):
     """ Configure repository """
     topsrcdir = repo_check(repo, workdir=True)
@@ -45,6 +47,7 @@ def repo_configure(repo):
 
 
 @task
+@roles('web')
 def repo_make(repo, *targets):
     """ Run make in repository """
     topsrcdir = repo_check(repo, workdir=True)
@@ -59,20 +62,22 @@ def repo_make(repo, *targets):
 
     ctx = {
         'topsrcdir': topsrcdir,
-        'targets' : " ".join(targets),
+        'targets': " ".join(targets),
     }
     ctx.update(env)
 
-    local("cd %(topsrcdir)s && make %(targets)s" % ctx)
+    sudo_local("cd %(topsrcdir)s && make %(targets)s" % ctx, user=env.CFG_INVENIO_USER)
 
 
 @task
+@roles('web')
 def repo_install(repo=None, targets_key='install_targets'):
     """ Run configure and make """
     repo_all_configure_make(repo, targets_key)
 
 
 @task
+@roles('web')
 def repo_prepare(repo=None):
     """ Prepare source code after fresh checkout """
     topsrcdir = repo_check(repo, workdir=True)
@@ -84,6 +89,7 @@ def repo_prepare(repo=None):
 
 
 @task
+@roles('web')
 def repo_setup(repo, ref):
     """ Clone repository """
     puts(cyan(">>> Setting up repository %s with ref %s..." % (repo, ref)))
@@ -92,29 +98,30 @@ def repo_setup(repo, ref):
     workdir = repo_check(repo, check_path=False, workdir=True)
     gitdir = os.path.join(topsrcdir, '.git')
 
-    if not os.path.exists(env.CFG_SRCDIR):
+    if not exists_local(env.CFG_SRCDIR):
         res = confirm("Create repository root %s?" % env.CFG_SRCDIR)
         if not res:
             abort(red("Cannot continue") % env)
         else:
-            local("mkdir -p %s" % env.CFG_SRCDIR)
+            sudo_local("mkdir -p %s" % env.CFG_SRCDIR, user=env.CFG_INVENIO_USER)
 
-    if not os.path.exists(gitdir) and os.path.exists(topsrcdir):
+    if not exists_local(gitdir) and exists_local(topsrcdir):
         res = confirm("Remove %s (it does not seem to be a git repository)?" % topsrcdir)
         if not res:
             abort(red("Cannot continue") % env)
         else:
-            local("rm -Rf %s" % topsrcdir)
+            sudo_local("rm -Rf %s" % topsrcdir, user=env.CFG_INVENIO_USER)
 
-    if not os.path.exists(gitdir):
+    if not exists_local(gitdir):
         git_clone(repo)
-    if not os.path.exists(workdir):
+    if not exists_local(workdir):
         git_newworkdir(repo)
     git_checkout(repo, ref)
     repo_prepare(repo)
 
 
 @task
+@roles('web')
 def repo_update(**kwargs):
     """ Pull repository updates """
     # Check repositories to update/setup
@@ -142,7 +149,7 @@ def repo_update(**kwargs):
         topsrcdir = repo_check(repo, check_path=False, workdir=True)
         gitdir = os.path.join(topsrcdir, '.git')
 
-        if not os.path.exists(gitdir):
+        if not exists_local(gitdir):
             repo_setup(repo, ref)
         else:
             if ref:
@@ -153,10 +160,10 @@ def repo_update(**kwargs):
                 commit_id = git_describe(repo)
                 puts(cyan(">>> No ref specified for repository %s (currently at HEAD, commit %s) ..." % (repo, commit_id)))
 
+
 #
 # Helpers
 #
-
 def repo_check(repo, check_path=True, workdir=False):
     all_repos = [x[0] for x in env.CFG_INVENIO_REPOS]
 
@@ -166,7 +173,7 @@ def repo_check(repo, check_path=True, workdir=False):
     repo_path = os.path.join(env.CFG_SRCWORKDIR if workdir and env.WITH_WORKDIR
                              else env.CFG_SRCDIR, repo)
 
-    if check_path and not os.path.exists(repo_path):
+    if check_path and not exists_local(repo_path):
         abort(red("Repository does not exists %s" % repo_path))
 
     return repo_path
@@ -188,24 +195,24 @@ def repo_all_configure_make(repo, target_key):
         except KeyError:
             repo_make(r, *['all', 'install'])
 
+
 #
 # Git helpers
 #
-
 def git_describe(repo):
     topsrcdir = repo_check(repo, workdir=True)
     version_gen = os.path.join(topsrcdir, 'git-version-gen')
 
-    if os.path.exists(version_gen):
-        output = local("cd %s; %s" % (topsrcdir, version_gen), capture=True)
+    if exists_local(version_gen):
+        output = sudo_local("cd %s; %s" % (topsrcdir, version_gen), capture=True, user=env.CFG_INVENIO_USER)
     else:
-        output = local("cd %s; git describe --always --abbrev=4 HEAD" % topsrcdir, capture=True)
+        output = sudo_local("cd %s; git describe --always --abbrev=4 HEAD" % topsrcdir, capture=True, user=env.CFG_INVENIO_USER)
     return output
 
 
 def git_show_ref(repo):
     topsrcdir = repo_check(repo, workdir=True)
-    local("cd %s; git show-ref" % topsrcdir)
+    sudo_local("cd %s; git show-ref" % topsrcdir, user=env.CFG_INVENIO_USER)
 
 
 def git_reset(repo, ref):
@@ -215,7 +222,7 @@ def git_reset(repo, ref):
         'ref': ref,
     }
     ctx.update(env)
-    local("cd %(topsrcdir)s; git reset --hard %(ref)s " % ctx)
+    sudo_local("cd %(topsrcdir)s; git reset --hard %(ref)s " % ctx, user=env.CFG_INVENIO_USER)
 
 
 def git_newworkdir(repo):
@@ -229,7 +236,7 @@ def git_newworkdir(repo):
         }
         ctx.update(env)
 
-        local("%(CFG_INVENIO_PREFIX)s/bin/git-new-workdir %(srcdir)s %(srcworkdir)s" % ctx)
+        sudo_local("%(CFG_INVENIO_PREFIX)s/bin/git-new-workdir %(srcdir)s %(srcworkdir)s" % ctx, user=env.CFG_INVENIO_USER)
 
 
 def git_isdirty(dir):
@@ -237,7 +244,7 @@ def git_isdirty(dir):
     Check working directory for uncommitted changes
     """
     with settings(hide('everything'), warn_only=True):
-        output = local("cd %s && git diff-index --exit-code HEAD --" % dir, capture=True)
+        output = sudo_local("cd %s && git diff-index --exit-code HEAD --" % dir, capture=True, user=env.CFG_INVENIO_USER)
     return output.return_code != 0
 
 
@@ -255,12 +262,15 @@ def git_checkout(repo, ref):
 
     # Stash uncommited changes
     if git_isdirty(topsrcdir):
-        if not confirm("Working directory %(topsrcdir)s contains uncommited changes. Do you want to stash the changes (required to continue)?" % ctx ):
-            abort("Cannot continue unless uncommitted changes are stashed")
+        if not confirm("Working directory %(topsrcdir)s contains uncommited changes. Do you want to stash the changes?" % ctx):
+            if not confirm("Do you want to reset the changes (required to continue)?" % ctx):
+                abort("Cannot continue unless uncommitted changes are stashed or reset.")
+            else:
+                sudo_local("cd %(topsrcdir)s; git reset --hard HEAD" % ctx, user=env.CFG_INVENIO_USER)
         else:
-            local("cd %(topsrcdir)s; git stash" % ctx)
+            sudo_local("cd %(topsrcdir)s; git stash" % ctx, user=env.CFG_INVENIO_USER)
 
-    local("cd %(topsrcdir)s; git checkout -f %(ref)s" % ctx)
+    sudo_local("cd %(topsrcdir)s; git checkout -f %(ref)s" % ctx, user=env.CFG_INVENIO_USER)
 
 
 def git_clone(repo):
@@ -274,15 +284,15 @@ def git_clone(repo):
     basename = os.path.basename(topsrcdir)
     parent = os.path.dirname(topsrcdir)
 
-    if os.path.exists(topsrcdir):
+    if exists_local(topsrcdir):
         res = confirm("Remove existing source code in %s ?" % topsrcdir)
         if not res:
             abort(red("Cannot continue") % env)
         else:
-            local("rm -Rf %s" % topsrcdir)
+            sudo_local("rm -Rf %s" % topsrcdir, user=env.CFG_INVENIO_USER)
     else:
-        if not os.path.exists(parent):
-            local("mkdir -p %s" % parent)
+        if not exists_local(parent):
+            sudo_local("mkdir -p %s" % parent, user=env.CFG_INVENIO_USER)
 
     ctx = {
         'basename': basename,
@@ -291,12 +301,12 @@ def git_clone(repo):
         'url': repo_url,
     }
 
-    local("cd %(parent)s; git clone %(url)s %(basename)s " % ctx)
+    sudo_local("cd %(parent)s; git clone %(url)s %(basename)s " % ctx, user=env.CFG_INVENIO_USER)
 
 
 def git_fetch(repo):
     topsrcdir = repo_check(repo)
-    local("cd %s; git fetch origin" % topsrcdir)
+    sudo_local("cd %s; git fetch origin" % topsrcdir, user=env.CFG_INVENIO_USER)
 
 
 #
@@ -318,6 +328,7 @@ def _run_hook(repo, hook_name, default_hook, *args, **kwargs):
     else:
         puts(">>> No hook found for %s" % hook_name)
 
+
 #
 # Built-in hooks
 #
@@ -325,17 +336,17 @@ def default_configure_hook(ctx):
     """
     Default way to configure a repo. Assumes repo has a configure script.
     """
-    if os.path.exists(os.path.join(ctx['topsrcdir'], "configure")):
+    if exists_local(os.path.join(ctx['topsrcdir'], "configure")):
         with settings(warn_only=True):
-            local("cd %(topsrcdir)s && make -s clean" % ctx)
-    local("cd %(topsrcdir)s && ./configure --prefix=%(CFG_INVENIO_PREFIX)s "
-          "--with-python=%(CFG_INVENIO_PREFIX)s/bin/python" % ctx)
-    local("cd %(topsrcdir)s && make -s clean" % ctx)
+            sudo_local("cd %(topsrcdir)s && make -s clean" % ctx, user=env.CFG_INVENIO_USER)
+    sudo_local("cd %(topsrcdir)s && ./configure --prefix=%(CFG_INVENIO_PREFIX)s "
+          "--with-python=%(CFG_INVENIO_PREFIX)s/bin/python" % ctx, user=env.CFG_INVENIO_USER)
+    sudo_local("cd %(topsrcdir)s && make -s clean" % ctx, user=env.CFG_INVENIO_USER)
 
 
 def default_prepare_hook(ctx):
     """
     Default way to prepare source code which uses autotools.
     """
-    if os.path.exists(os.path.join(ctx['topsrcdir'], "configure.ac")):
-        local("cd %(topsrcdir)s; aclocal && automake -a && autoconf -f" % ctx)
+    if exists_local(os.path.join(ctx['topsrcdir'], "configure.ac")):
+        sudo_local("cd %(topsrcdir)s; aclocal && automake -a && autoconf -f" % ctx, user=env.CFG_INVENIO_USER)

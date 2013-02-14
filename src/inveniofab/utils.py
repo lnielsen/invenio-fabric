@@ -15,13 +15,48 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
-from fabric.api import prompt, env, local, abort, warn
+from fabric.api import prompt, env, abort, warn, get, put, roles, task, execute
+from fabric.api import local as fab_local, run as fab_run, sudo as fab_sudo
 from fabric.colors import red
+from fabric.contrib.files import exists as fab_exists, append as fab_append
 from jinja2 import Environment, FileSystemLoader
 from jinja2.exceptions import TemplateNotFound
 import getpass
 import os
 import re
+from StringIO import StringIO
+
+
+def is_local():
+    """ Determine if env.host is localhost """
+    return (env.host in ['localhost', '127.0.0.1'] or env.host is None)
+
+
+def run_local(command, shell=True, pty=True, combine_stderr=True, capture=False):
+    """ run/local function based on host """
+    if is_local():
+        return fab_local(command, capture=capture)
+    else:
+        return fab_run(command, shell=shell, pty=pty, combine_stderr=combine_stderr)
+
+
+def sudo_local(command, shell=True, pty=True, combine_stderr=True, user=None, capture=False):
+    """ sudo/local function based on host """
+    if env.user == user:
+        run_local(command, shell=shell, pty=pty, combine_stderr=combine_stderr, capture=capture)
+    else:
+        if is_local():
+            return fab_local("sudo %s" % command, capture=capture)
+        else:
+            return fab_sudo(command, shell=shell, pty=pty, combine_stderr=combine_stderr, user=user)
+
+
+def exists_local(path, use_sudo=False, verbose=False):
+    if is_local():
+        return os.path.exists(path)
+    else:
+        return fab_exists(path, use_sudo=use_sudo, verbose=verbose)
+
 
 def prompt_and_check(questions, check_func, cache_key=None, stored_answers=None):
     """
@@ -34,7 +69,7 @@ def prompt_and_check(questions, check_func, cache_key=None, stored_answers=None)
             answers = stored_answers
             done = True
 
-    if cache_key and cache_key in env.get('answers_cache',{}):
+    if cache_key and cache_key in env.get('answers_cache', {}):
         return env.answers_cache[cache_key]
 
     while not done:
@@ -54,7 +89,7 @@ def prompt_and_check(questions, check_func, cache_key=None, stored_answers=None)
     return answers
 
 
-def write_template(filename, context, tpl_str=None, tpl_file=None, append=False, mark=None):
+def write_template(filename, context, tpl_str=None, tpl_file=None, remote_tpl_file=None, append=False, mark=None, use_sudo=False):
     """
     Render template and write output to file
 
@@ -68,12 +103,18 @@ def write_template(filename, context, tpl_str=None, tpl_file=None, append=False,
     if tpl_file:
         try:
             tpl = env.jinja.get_template(tpl_file)
-        except TemplateNotFound, e:
+        except TemplateNotFound:
             jinja = Environment(loader=FileSystemLoader([os.path.dirname(tpl_file)]))
             tpl = jinja.get_template(os.path.basename(tpl_file))
+    elif remote_tpl_file:
+        f = StringIO()
+        get(remote_tpl_file, f)
+        tpl = env.jinja.from_string(f.getvalue())
+        f.close()
     elif tpl_str:
         tpl = env.jinja.from_string(tpl_str)
     content = tpl.render(context)
+
     if append and mark is not None:
         start_mark = "### START: %s ###" % mark
         end_mark = "### END: %s ###" % mark
@@ -83,7 +124,12 @@ def write_template(filename, context, tpl_str=None, tpl_file=None, append=False,
         skip = False
         added = False
 
-        f = open(filename, 'r')
+        if is_local():
+            f = open(filename, 'r')
+        else:
+            f = StringIO()
+            get(filename, f)
+
         for line in f:
             if line == start_mark:
                 skip = True
@@ -102,14 +148,20 @@ def write_template(filename, context, tpl_str=None, tpl_file=None, append=False,
         else:
             content = marked_content
 
-    f = open(filename, 'a' if append else 'w')
-    f.write(content.encode('utf8'))
-    f.close()
+    if is_local():
+        f = open(filename, 'a' if append else 'w')
+        f.write(content.encode('utf8'))
+        f.close()
+    else:
+        if append:
+            fab_append(filename, content.encode('utf8'), use_sudo=use_sudo)
+        else:
+            put(StringIO(content.encode('utf8')), filename, use_sudo=use_sudo)
 
 
 def python_version():
     """ Determine Python version """
-    return local(("%(CFG_INVENIO_PREFIX)s/bin/python -c \"import sys;print str(sys.version_info[0]) + '.' + str(sys.version_info[1])\"") % env, capture=True)
+    return run_local(("%(CFG_INVENIO_PREFIX)s/bin/python -c \"import sys;print str(sys.version_info[0]) + '.' + str(sys.version_info[1])\"") % env, capture=True)
 
 
 def pythonbrew_versions():
@@ -137,16 +189,43 @@ def template_hook_factory(tpl_file, filename, warn_only=True):
     """
     Factory method for generating hook functions that renders a template,
     and writes it to a specific location.
-    
+
     Filename may include string replacement like e.g. %(CFG_INVENIO_PREFIX)s.
     """
     def write_template_hook(ctx):
         try:
             write_template(filename % ctx, ctx, tpl_file=tpl_file)
-        except TemplateNotFound, e:
+        except TemplateNotFound:
             if warn_only:
                 warn(red("Couldn't find template %s" % tpl_file))
             else:
                 abort(red("Couldn't find template %s" % tpl_file))
 
     return write_template_hook
+
+
+def _first(f, dirs=['']):
+    for d in dirs:
+        env_f = os.path.join(d, f)
+        if os.path.exists(env_f):
+            return (env_f, f)
+    abort("File %s not found" % f)
+
+
+def _upload(fs):
+    for local_f, remote_f in fs:
+        remote_f = os.path.join(env.CFG_INVENIO_PREFIX, remote_f)
+        basedir = os.path.dirname(remote_f)
+        if not exists_local(basedir, use_sudo=True):
+            sudo_local("mkdir -p %s" % basedir, user=env.CFG_INVENIO_USER)
+        put(local_f, remote_f, use_sudo=True)
+
+
+@task
+def upload_files():
+    """
+    Upload files specified by CFG_FILES
+    """
+    for role, files in env.get('CFG_FILES', {}).items():
+        files = map(lambda f: _first(f, dirs=[env.env_name, 'common']), files)
+        execute(_upload, files, role=role)

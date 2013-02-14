@@ -16,7 +16,7 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 """
-Tasks for Apache start/stop/restarting apache. 
+Tasks for Apache start/stop/restarting apache.
 
 All tasks assume ``env.CFG_INVENIO_APACHECTL`` is defined and points to your
 Apache control script (e.g. ``/etc/init.d/apache2`` or ``../apachectl``). The
@@ -27,21 +27,28 @@ script must support the following commands: start, stop, configtest, graceful.
   These tasks are not working locally like the rest Invenio Fabric library.
 """
 
-from fabric.api import roles, sudo, task, env
+from fabric.api import roles, sudo, task, env, puts, abort, warn
+from fabric.colors import cyan, red
+from fabric.contrib.console import confirm
+from fabric.contrib.files import append
+from inveniofab.utils import write_template, sudo_local, exists_local, is_local
+from jinja2.exceptions import TemplateNotFound
+import os
 
-@roles('web')
+
 @task
+@roles('web')
 def apache_start():
     """ Start Apache """
     sudo("%(CFG_INVENIO_APACHECTL)s start" % env)
 
 
-@roles('web')
 @task
+@roles('web')
 def apache_restart():
     """
     Restart Apache
-    
+
     The task will first test the configuration and afterwards gracefully
     restart Apache.
     """
@@ -49,8 +56,36 @@ def apache_restart():
     sudo("%(CFG_INVENIO_APACHECTL)s graceful" % env)
 
 
-@roles('web')
 @task
+@roles('web')
 def apache_stop():
     """ Stop Apache """
     sudo("%(CFG_INVENIO_APACHECTL)s stop" % env)
+
+
+@task
+@roles('web')
+def apache_conf():
+    """ Upload and update Apache configuration """
+    puts(cyan(">>> Configuring Apache..." % env))
+
+    conf_files = ['etc/apache/invenio-apache-vhost.conf', 'etc/apache/invenio-apache-vhost-ssl.conf']
+    conf_files = [(p, os.path.join(env.CFG_INVENIO_PREFIX, p)) for p in conf_files]
+
+    for local_file, remote_file in conf_files:
+        puts(">>> Writing %s ..." % remote_file)
+
+        try:
+            write_template(remote_file, env, tpl_file=local_file, use_sudo=True)
+        except TemplateNotFound:
+            abort(red("Could not find template %s" % local_file))
+
+    apache_conf = env.get('CFG_APACHE_CONF', '/etc/httpd/conf/httpd.conf')
+    if not is_local() and confirm("Include created files in %s?" % apache_conf):
+        if exists_local(apache_conf, use_sudo=True):
+            lines = ["Include %s" % r for (l, r) in conf_files]
+            append(apache_conf, lines, use_sudo=True)
+        else:
+            warn(red("File %s does not exists" % apache_conf))
+
+    sudo_local("%(CFG_INVENIO_APACHECTL)s configtest" % env)

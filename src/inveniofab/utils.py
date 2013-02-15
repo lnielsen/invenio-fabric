@@ -43,7 +43,7 @@ def run_local(command, shell=True, pty=True, combine_stderr=True, capture=False)
 def sudo_local(command, shell=True, pty=True, combine_stderr=True, user=None, capture=False):
     """ sudo/local function based on host """
     if env.user == user:
-        run_local(command, shell=shell, pty=pty, combine_stderr=combine_stderr, capture=capture)
+        return run_local(command, shell=shell, pty=pty, combine_stderr=combine_stderr, capture=capture)
     else:
         if is_local():
             return fab_local("sudo %s" % command, capture=capture)
@@ -100,17 +100,22 @@ def write_template(filename, context, tpl_str=None, tpl_file=None, remote_tpl_fi
     @param mark: str, If append is true and mark is defined, then the rendered
                  template will replace any previous appened version.
     """
+    # If we're in local mode, interpret remote_tpl_file as it was a local file.
+    if is_local() and remote_tpl_file:
+        tpl_file = remote_tpl_file
+        remote_tpl_file = None
+
+    if remote_tpl_file:
+        f = StringIO()
+        get(remote_tpl_file, f)
+        tpl = env.jinja.from_string(f.getvalue())
+        f.close()
     if tpl_file:
         try:
             tpl = env.jinja.get_template(tpl_file)
         except TemplateNotFound:
             jinja = Environment(loader=FileSystemLoader([os.path.dirname(tpl_file)]))
             tpl = jinja.get_template(os.path.basename(tpl_file))
-    elif remote_tpl_file:
-        f = StringIO()
-        get(remote_tpl_file, f)
-        tpl = env.jinja.from_string(f.getvalue())
-        f.close()
     elif tpl_str:
         tpl = env.jinja.from_string(tpl_str)
     content = tpl.render(context)
@@ -218,7 +223,10 @@ def _upload(fs):
         basedir = os.path.dirname(remote_f)
         if not exists_local(basedir, use_sudo=True):
             sudo_local("mkdir -p %s" % basedir, user=env.CFG_INVENIO_USER)
-        put(local_f, remote_f, use_sudo=True)
+        if is_local():
+            sudo_local("cp %s %s" % (local_f, remote_f), user=env.CFG_INVENIO_USER)
+        else:
+            put(local_f, remote_f, use_sudo=True)
 
 
 @task

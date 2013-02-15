@@ -328,14 +328,17 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
     if python is None:
         pythonbin = 'python'
     else:
-        python_versions = pythonbrew_versions()
-        if python in python_versions:
-            pythonbin = python_versions[python]
+        if os.path.exists(python):
+            pythonbin = python
         else:
-            python_versions = python_versions.keys()
-            python_versions.sort()
-            abort("Unknown Python version %s. Available versions are %s" % (
-                  python, ", ".join(python_versions)))
+            python_versions = pythonbrew_versions()
+            if python in python_versions:
+                pythonbin = python_versions[python]
+            else:
+                python_versions = python_versions.keys()
+                python_versions.sort()
+                abort("Unknown Python version %s. Available versions are %s" % (
+                      python, ", ".join(python_versions)))
 
     env.update({
         'WITH_VIRTUALENV': True,

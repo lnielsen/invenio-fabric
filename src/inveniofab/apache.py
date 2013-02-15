@@ -27,7 +27,7 @@ script must support the following commands: start, stop, configtest, graceful.
   These tasks are not working locally like the rest Invenio Fabric library.
 """
 
-from fabric.api import roles, sudo, task, env, puts, abort, warn
+from fabric.api import roles, sudo, task, env, puts, abort, warn, settings
 from fabric.colors import cyan, red
 from fabric.contrib.console import confirm
 from fabric.contrib.files import append
@@ -76,15 +76,21 @@ def apache_conf():
         puts(">>> Writing %s ..." % remote_file)
 
         try:
+            if not exists_local(os.path.dirname(remote_file)):
+                sudo_local("mkdir -p %s" % os.path.dirname(remote_file), user=env.CFG_INVENIO_USER)
             write_template(remote_file, env, tpl_file=local_file, use_sudo=True)
         except TemplateNotFound:
             abort(red("Could not find template %s" % local_file))
 
     apache_conf = env.get('CFG_APACHE_CONF', '/etc/httpd/conf/httpd.conf')
-    if not is_local() and confirm("Include created files in %s?" % apache_conf):
+    if confirm("Include created files in %s?" % apache_conf):
         if exists_local(apache_conf, use_sudo=True):
             lines = ["Include %s" % r for (l, r) in conf_files]
-            append(apache_conf, lines, use_sudo=True)
+            if is_local():
+                with settings(host_string="localhost"):
+                    append(apache_conf, lines, use_sudo=True)
+            else:
+                append(apache_conf, lines, use_sudo=True)
         else:
             warn(red("File %s does not exists" % apache_conf))
 

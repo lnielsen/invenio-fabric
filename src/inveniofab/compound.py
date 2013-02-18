@@ -19,7 +19,7 @@
 Compound tasks to perform bigger operations like bootstrapping Invenio.
 """
 
-from fabric.api import task, env
+from fabric.api import task, env, roles
 from fabric.colors import cyan
 from fabric.contrib.console import confirm
 from inveniofab.devserver import devserver_conf
@@ -35,12 +35,13 @@ from inveniofab.inspire import inspire_dbchanges
 
 
 @task
+@roles('web')
 def bootstrap(with_db=True, quite=False, **kwargs):
     """
     Bootstrap an Invenio installation
-    
+
     Bootstrap will run the following tasks:
-    
+
      * ``mysql_dropdb`` - to drop an existing database if it exists.
      * ``mysql_createdb`` - to create database and user.
      * ``venv_create`` - to create a virtual environment.
@@ -82,13 +83,14 @@ def bootstrap(with_db=True, quite=False, **kwargs):
 
 
 @task
+@roles('web')
 def install(quite=False, **kwargs):
     """
     Install repositories
-    
+
     The task will checkout latest changes for the repositories, run make install,
     ``inveniocfg --update-all --upgrade``.
-    
+
     :param quite: Default ``False``. Set to ``True`` to disable user confirmation.
     """
 
@@ -103,10 +105,11 @@ def install(quite=False, **kwargs):
 
 
 @task
+@roles('web')
 def dump():
     """
     Archive installation
-    
+
     Dump a database and virtual environment to an archive which can later be
     restored with :meth:`~load`.
     """
@@ -115,10 +118,11 @@ def dump():
 
 
 @task
+@roles('web')
 def load():
     """
     Load archived installation
-    
+
     Load an archived virtual environment and database which was dumped with
     :meth:`~dump`.
     """
@@ -127,10 +131,11 @@ def load():
 
 
 @task
+@roles('web')
 def drop():
     """
     Remove installation
-    
+
     Remove virtual environment, database and database user.
     """
     venv_drop()

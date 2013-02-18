@@ -20,7 +20,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='invenio-fabric',
-    version='0.2.6',
+    version='0.2.8',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=False,

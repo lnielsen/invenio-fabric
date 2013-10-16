@@ -39,8 +39,9 @@ CFG_SITE_URL = http://{{CFG_INVENIO_HOSTNAME}}:{{CFG_INVENIO_PORT_HTTP}}
 CFG_SITE_SECURE_URL = http://{{CFG_INVENIO_HOSTNAME}}:{{CFG_INVENIO_PORT_HTTPS}}
 CFG_SITE_ADMIN_EMAIL = {{CFG_INVENIO_ADMIN}}
 CFG_SITE_SUPPORT_EMAIL = {{CFG_INVENIO_ADMIN}}
-CFG_SITE_NAME = Atlantis Fictive Institute of Science
+CFG_SITE_NAME = Atlantis Institute of Fictive Science
 CFG_SITE_NAME_INTL_fr = Atlantis Institut des Sciences Fictives
+CFG_SITE_SECRET_KEY = changeme
 # Next two is only for runnning a debugging mail server
 {% if CFG_MISCUTIL_SMTP_HOST and CFG_MISCUTIL_SMTP_PORT %}
 CFG_MISCUTIL_SMTP_HOST = {{CFG_MISCUTIL_SMTP_HOST}}
@@ -48,8 +49,9 @@ CFG_MISCUTIL_SMTP_PORT = {{CFG_MISCUTIL_SMTP_PORT}}
 {% endif %}
 CFG_DEVEL_SITE = 0
 CFG_SITE_EMERGENCY_EMAIL_ADDRESSES = {'*': '{{CFG_INVENIO_ADMIN}}'}
-CFG_WEBSTYLE_INSPECT_TEMPLATES = 0
 CFG_FLASK_CACHE_TYPE = redis
+CFG_FLASK_SERVE_STATIC_FILES = 1
+CFG_DEVEL_TOOLS = debug-toolbar,werkzeug-debugger,assets-debug
 """
 
 
@@ -78,7 +80,8 @@ def invenio_conf():
             else:
                 write_template(invenio_local_remote, env, tpl_str=INVENIO_LOCAL_TPL, use_sudo=True)
 
-    inveniocfg("--update-all")
+    if confirm(cyan("Run config update")):
+        inveniocfg("--update-all")
 
 
 @task
@@ -86,7 +89,7 @@ def invenio_conf():
 def invenio_upgrade():
     """ Upgrade Invenio """
     puts(cyan(">>> Upgrading Invenio..." % env))
-    inveniocfg("--upgrade")
+    inveniomanage("upgrade run")
 
 
 @task
@@ -114,3 +117,7 @@ def inveniocfg(options):
     """
     #cmds = " && ".join([]) % env
     sudo_local(("%(CFG_INVENIO_PREFIX)s/bin/inveniocfg " % env) + options, user=env.CFG_INVENIO_USER)
+
+
+def inveniomanage(options):
+    sudo_local(("%(CFG_INVENIO_PREFIX)s/bin/inveniomanage " % env) + options, user=env.CFG_INVENIO_USER)

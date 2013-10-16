@@ -37,6 +37,10 @@ setup(
             'examples/atlantis/common/requirements-extra.txt',
             'examples/atlantis/common/rundevserver.py.tpl',
         ]),
+        ('share/atlantis/common/etc/apache/',[
+            'examples/atlantis/common/etc/apache/invenio-apache-vhost.conf',
+            'examples/atlantis/common/etc/apache/invenio-apache-vhost-ssl.conf',
+        ]),
         ('share/openaire/',[
             'examples/openaire/fabfile.py',
         ]),

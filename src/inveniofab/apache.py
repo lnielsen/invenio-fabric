@@ -31,7 +31,8 @@ from fabric.api import roles, sudo, task, env, puts, abort, warn, settings
 from fabric.colors import cyan, red
 from fabric.contrib.console import confirm
 from fabric.contrib.files import append
-from inveniofab.utils import write_template, sudo_local, exists_local, is_local
+from inveniofab.utils import write_template, sudo_local, exists_local, \
+    is_local, python_version
 from jinja2.exceptions import TemplateNotFound
 import os
 
@@ -67,10 +68,64 @@ def apache_stop():
 @roles('web')
 def apache_conf():
     """ Upload and update Apache configuration """
+    _apache_conf(['etc/apache/invenio-apache-vhost.conf', 'etc/apache/invenio-apache-vhost-ssl.conf'])
+
+
+#
+# Apache frontend proxy
+#
+@task
+@roles('lb')
+def apache_proxy_start():
+    """ Start Apache """
+    sudo("%(CFG_INVENIO_APACHECTL)s start" % env)
+
+
+@task
+@roles('lb')
+def apache_proxy_restart():
+    """
+    Restart Apache
+
+    The task will first test the configuration and afterwards gracefully
+    restart Apache.
+    """
+    sudo("%(CFG_INVENIO_APACHECTL)s configtest" % env)
+    sudo("%(CFG_INVENIO_APACHECTL)s graceful" % env)
+
+
+@task
+@roles('lb')
+def apache_proxy_stop():
+    """ Stop Apache """
+    sudo("%(CFG_INVENIO_APACHECTL)s stop" % env)
+
+
+@task
+@roles('lb')
+def apache_proxy_conf():
+    """ Upload and update Apache configuration """
+    _apache_conf(
+        ['etc/apache/invenio-apache-proxy-vhosts.conf', ],
+        with_python=False
+    )
+
+
+#
+# General methods
+#
+def _apache_conf(files, with_python=True):
     puts(cyan(">>> Configuring Apache..." % env))
 
-    conf_files = ['etc/apache/invenio-apache-vhost.conf', 'etc/apache/invenio-apache-vhost-ssl.conf']
+    conf_files = files
     conf_files = [(p, os.path.join(env.CFG_INVENIO_PREFIX, p)) for p in conf_files]
+
+    if with_python:
+        pyver = python_version()
+        ctx = {'PYVER': pyver}
+    else:
+        ctx = {}
+    ctx.update(env)
 
     for local_file, remote_file in conf_files:
         puts(">>> Writing %s ..." % remote_file)
@@ -78,7 +133,7 @@ def apache_conf():
         try:
             if not exists_local(os.path.dirname(remote_file)):
                 sudo_local("mkdir -p %s" % os.path.dirname(remote_file), user=env.CFG_INVENIO_USER)
-            write_template(remote_file, env, tpl_file=local_file, use_sudo=True)
+            write_template(remote_file, ctx, tpl_file=local_file, use_sudo=True)
         except TemplateNotFound:
             abort(red("Could not find template %s" % local_file))
 

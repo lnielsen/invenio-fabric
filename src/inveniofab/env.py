@@ -22,7 +22,7 @@ Fabric environment dictionary
 ---------------------------
 An integral part of Fabric is what is know as "environments": a Python dictionary
 subclass which is used as a combination settings registry and shared inter-task
-data namespace. Most of Fabric's and Invenio Fabrics behaviour is modifiable 
+data namespace. Most of Fabric's and Invenio Fabrics behaviour is modifiable
 through env variables.
 
 The environment is accessible through ``fabric.api.env``, and allows e.g. a task
@@ -34,17 +34,17 @@ access to the current user etc (``user`` is called an env variable)::
       print env.user
       print env.host
 
-For more information on Fabric environment dictionary please see 
+For more information on Fabric environment dictionary please see
 http://fabric.readthedocs.org/en/latest/usage/env.html
 
 Invenio Fabric environments
 ---------------------------
 The tasks in this module helps you define the env variables which all other
-Invenio Fabric tasks depends on. Secondly, it provide means for loading 
+Invenio Fabric tasks depends on. Secondly, it provide means for loading
 env variables, but without putting them in ``fabric.api.env``. This is useful
 for tasks like ``fab int mysql_copy:prod`` which would copy the database from
 production to integration, and thus need access to host, user, password etc from
-both the integration and production environment at the same time. 
+both the integration and production environment at the same time.
 
 Usage
 ^^^^^
@@ -85,7 +85,7 @@ In the example above, you could for instance run::
 
   fab prod bootstrap
 
-to bootstrap the production environment. I.e. you always call an environment 
+to bootstrap the production environment. I.e. you always call an environment
 task as the first task.
 
 Also note, that some task takes parameters::
@@ -103,8 +103,8 @@ By default the following roles are defined:
  * ``db-slave`` - slave databases
  * ``workers`` - worker nodes
 
-Some task will use these roles to decide which machine to execute a given 
-command on. For more on Fabric roles please see 
+Some task will use these roles to decide which machine to execute a given
+command on. For more on Fabric roles please see
 http://fabric.readthedocs.org/en/1.4.3/usage/execution.html#roles
 
 You may override these roles in your environment task::
@@ -113,13 +113,13 @@ You may override these roles in your environment task::
   def prod(activate=True):
       env = env_create('prod', activate=activate)
       env.roledefs['web'] = [...]
-      return env 
+      return env
 
 Creating tasks
 --------------
 When creating task you can access the variables simply by loading the Fabric
-env dictionary from ``fabric.api.env``. All Invenio Fabric env variables are 
-upper-case (for now, please look in the source code of :meth:`~env_defaults` to 
+env dictionary from ``fabric.api.env``. All Invenio Fabric env variables are
+upper-case (for now, please look in the source code of :meth:`~env_defaults` to
 see, which variables are defined).
 
 Example::
@@ -155,11 +155,11 @@ looks like below::
   common/etc/invenio-local.conf
   int/etc/invenio-local.conf
 
-Running ``fab int sometask`` would use the template 
-``int/etc/invenio-local.conf``, while ``fab prod sometask`` and 
+Running ``fab int sometask`` would use the template
+``int/etc/invenio-local.conf``, while ``fab prod sometask`` and
 ``fab loc sometask`` would use the template ``common/etc/invenio-local.conf``.
 
-This allows you to define common templates for configuration files, and 
+This allows you to define common templates for configuration files, and
 selectively override them for certain environments if needed.
 
 
@@ -170,7 +170,7 @@ Many variables map directly to their Invenio counterpart - e.g.
 Invenio Fabric ``env.CFG_DATABASE_NAME``.
 
 Usually when deploying or working with a specific Invenio project, some
-configuration variables depend only on the project (e.g. 
+configuration variables depend only on the project (e.g.
 ``CFG_WEBSTYLE_TEMPLATE_SKIN``), while others depend
 on the deployment environment (e.g. ``CFG_DATABASE_HOST``).
 
@@ -341,6 +341,7 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
                       python, ", ".join(python_versions)))
 
     env.update({
+        'NAME': name,
         'WITH_VIRTUALENV': True,
         'WITH_DEVSERVER': True,
         'WITH_WORKDIR': True,
@@ -356,25 +357,32 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
         'CFG_SRCWORKDIR': os.path.join(prefix, 'src'),
         'CFG_INVENIO_HOSTNAME': "localhost",
         'CFG_INVENIO_DOMAINNAME': "",
-        'CFG_INVENIO_PORT_HTTP': "4000",
-        'CFG_INVENIO_PORT_HTTPS': "4000",
+        'CFG_INVENIO_PORT_HTTP': 80,
+        'CFG_INVENIO_PORT_HTTPS': 443,
         'CFG_INVENIO_USER': env.user,
         'CFG_INVENIO_ADMIN': 'nobody@localhost',
 
         'CFG_INVENIO_APACHECTL': '/etc/init.d/httpd',
         'CFG_APACHE_CONF': '/etc/httpd/conf/httpd.conf',
+        'CFG_APACHE_DEBUG': False,
 
         'CFG_DATABASE_DUMPDIR': prefix,
         'CFG_DATABASE_HOST': 'localhost',
         'CFG_DATABASE_PORT': 3306,
         'CFG_DATABASE_NAME': name,
         'CFG_DATABASE_USER': name,
-        'CFG_DATABASE_PASS': 'my123p$ss',
+        'CFG_DATABASE_PASS': 'qwerty',
         'CFG_DATABASE_DROP_ALLOWED': True,
 
         # FIXME: Set to localhost or leave empty?
         'CFG_MISCUTIL_SMTP_HOST': '127.0.0.1',
         'CFG_MISCUTIL_SMTP_PORT': '1025',
+
+        'CFG_CELERY_BEAT_HOST': 'localhost',
+        'CFG_BIBSCHED_HOST': 'localhost',
+
+        'CFG_REDIS_PASSWORD': '',
+        'CFG_REDIS_DB': 0,
 
         # FIXME: Should be removed, so Inspire stuff is not integrated in main
         # source file.
@@ -385,7 +393,11 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
         ('invenio', {
             'repository': 'http://invenio-software.org/repo/invenio/',
             'ref': 'master',
-            'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin', 'install-ckeditor-plugin', 'install-pdfa-helper-files', 'install-jquery-plugins', ],
+            'bootstrap_targets': ['all', 'install', 'install-mathjax-plugin',
+                'install-ckeditor-plugin', 'install-pdfa-helper-files',
+                'install-jquery-plugins', 'install-jquery-tokeninput',
+                'install-plupload-plugin', 'install-js-test-driver',
+                'install-mediaelement', ],
             'deploy_targets': ['all', 'check-upgrade', 'install', ],
             'requirements': ['requirements.txt', 'requirements-extra.txt', ],
             #'configure_hook': None, # Can be specified if you want to override default behaviour (./configure --with-prefix=.. --with-python=..)

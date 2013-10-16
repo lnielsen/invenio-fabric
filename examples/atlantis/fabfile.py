@@ -49,40 +49,55 @@ def loc(activate=True, py=None, ref=None, **kwargs):
 
     env = env_create('loc', activate=activate, python=py, **kwargs)
 
-    return env_override(env, 'invenio', ref, {'ref': ref})
+    return env_override(env, 'invenio', ref)
 
 
 @task
 def int(activate=True, **kwargs):
-    """ Environment: Integration """
+    """ Remote environment example
+
+    Atlantis with Invenio next
+
+    Usage example:
+        fab int bootstrap
+        fab int venv_pyuno_install
+        fab int venv_libxslt_install
+        fab int apache_conf
+
+    Note for apache_conf task to work, you'll likely have to edit the two
+    inveni-apache-vhost(-ssl).conf templates (especially the location of the SSL
+    key and certificate).
+    """
     env = env_create('int', activate=activate, **kwargs)
 
     env.roledefs = {
-        'web': ['pccis92.cern.ch', ],
+        'web': ['somehost.cern.ch', ],
         'lb': [],
-        'db-master': ['pccis92.cern.ch', ],
+        'db-master': ['somehost.cern.ch', ],
         'db-slave': [],
-        'workers': ['pccis92.cern.ch', ],
+        'workers': ['somehost.cern.ch', ],
     }
 
-    env.CFG_SRCDIR = '/opt/cdsweb/src'
+    env.CFG_SRCDIR = '/opt/atlantis/src'
     env.CFG_INVENIO_SRCDIR = os.path.join(env.CFG_SRCDIR, 'invenio')
-    env.CFG_INVENIO_PREFIX = '/opt/cdsweb'
+    env.CFG_INVENIO_PREFIX = '/opt/atlantis'
     env.CFG_INVENIO_CONF = 'etc/invenio-local.conf'
-    env.CFG_INVENIO_HOSTNAME = "pccis82"
+    env.CFG_INVENIO_HOSTNAME = "somehost"
     env.CFG_INVENIO_DOMAINNAME = ".cern.ch"
     env.CFG_INVENIO_PORT_HTTP = "80"
     env.CFG_INVENIO_PORT_HTTPS = "443"
     env.CFG_INVENIO_USER = 'apache'
     env.CFG_INVENIO_APACHECTL = '/etc/init.d/httpd'
-    env.CFG_INVENIO_ADMIN = 'cds-admin@cern.ch'
+    env.CFG_INVENIO_ADMIN = 'foo@bar.com'
 
-    #env.CFG_FILES = {
-    #    'web': [
-    #        'etc/certs/zenodo-dev.cern.ch.crt',
-    #        'etc/certs/zenodo-dev.cern.ch.key',
-    #    ]
-    #}
+    # Specify files to upload with task: upload_files
+    # env.CFG_FILES = {
+    #     'web': [
+    #         # File paths are relative to common/ directory.
+    #         'etc/certs/somehost.cern.ch.crt',
+    #         'etc/certs/somehost.cern.ch.key',
+    #     ]
+    # }
 
     env.CFG_INVENIO_REPOS = [
         ('invenio', {
@@ -95,21 +110,15 @@ def int(activate=True, **kwargs):
                 '%(CFG_INVENIO_SRCDIR)s/requirements-flask.txt',
                 '%(CFG_INVENIO_SRCDIR)s/requirements-flask-ext.txt', ],
         }),
-        # ('openaire', {
-        #     'repository': 'https://github.com/Zenodo/zenodo.git',
-        #     'ref': 'origin/next',
-        #     'bootstrap_targets': ['all', 'install', ],
-        #     'deploy_targets': ['all', 'install', ],
-        #     'requirements': ['%(CFG_OPENAIRE_SRCDIR)s/requirements.txt'],
-        # }),
     ]
 
     env.CFG_DATABASE_DUMPDIR = env.CFG_INVENIO_PREFIX
     env.CFG_DATABASE_HOST = 'localhost'
     env.CFG_DATABASE_PORT = 3306
-    env.CFG_DATABASE_NAME = 'cds'
-    env.CFG_DATABASE_USER = 'cds'
-    env.CFG_DATABASE_PASS = 'blabla'
+    env.CFG_DATABASE_NAME = 'somehost_int'
+    env.CFG_DATABASE_USER = 'somehost_int'
+    env.CFG_DATABASE_PASS = 'somepw'
     env.CFG_DATABASE_DROP_ALLOWED = True
 
     env.WITH_WORKDIR = False
+    env.WITH_DEVSERVER = False

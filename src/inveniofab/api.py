@@ -24,7 +24,8 @@ of your file::
 """
 
 from inveniofab.apache import apache_start, apache_restart, apache_stop, \
-    apache_conf
+    apache_conf, apache_proxy_start, apache_proxy_restart, apache_proxy_stop, \
+    apache_proxy_conf
 from inveniofab.env import env_defaults, env_get, env_create, env_override, \
     env_make_name
 from inveniofab.git import repo_update, repo_setup, repo_prepare, \
@@ -32,10 +33,15 @@ from inveniofab.git import repo_update, repo_setup, repo_prepare, \
 from inveniofab.invenio import invenio_conf, invenio_create_demosite, \
     invenio_createdb, invenio_upgrade
 from inveniofab.mysql import mysql_dropdb, mysql_createdb, mysql_load, \
-    mysql_dump, mysql_copy
+    mysql_dump, mysql_copy, mysql_conf
 from inveniofab.test import test_load, test_dump, test_clean, test_reset_admin
 from inveniofab.venv import venv_create, venv_dump, venv_load, venv_drop, \
     venv_requirements, venv_pyuno_install, venv_libxslt_install
 from inveniofab.compound import bootstrap, install, dump, load, drop
 from inveniofab.devserver import devserver_conf, devserver_install_flask
-from inveniofab.utils import upload_files
+from inveniofab.utils import upload_files, sublime_project, symlinks
+from inveniofab.celery import celery_initd, celery_start, celery_stop, \
+    celery_restart
+from inveniofab.haproxy import haproxy_conf, haproxy_start, haproxy_stop, \
+    haproxy_restart, haproxy_disable_server, haproxy_enable_server
+from inveniofab.afs import *

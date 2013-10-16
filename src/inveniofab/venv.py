@@ -80,7 +80,7 @@ def venv_libxslt_install():
 
 @task
 @roles('web')
-def venv_requirements():
+def venv_requirements(upgrade=False):
     """
     Install Python packages
 
@@ -103,7 +103,7 @@ def venv_requirements():
         reqfile = reqfile % env
         reqpath = os.path.join(env.CFG_INVENIO_PREFIX, "%s_%s" % (repo, os.path.basename(reqfile)))
 
-        ctx = {'reqpath': reqpath, 'reqfile': reqfile, 'pyver': pyver}
+        ctx = {'reqpath': reqpath, 'reqfile': reqfile, 'pyver': pyver, 'upgrade': '--upgrade' if upgrade else ''}
         ctx.update(env)
 
         puts(">>> Writing requirements to %(reqpath)s ..." % ctx)
@@ -111,11 +111,11 @@ def venv_requirements():
         reqpaths.append(reqpath)
 
     for reqpath in reqpaths:
-        puts(">>> Installing requirements from %(reqpath)s ..." % ctx)
-        ctx = {'reqpath': reqpath, 'pyver': pyver}
+        ctx = {'reqpath': reqpath, 'pyver': pyver, 'upgrade': '--upgrade' if upgrade else ''}
         ctx.update(env)
+        puts(">>> Installing requirements from %(reqpath)s ..." % ctx)
         cmds = [env.ACTIVATE] if env.WITH_VIRTUALENV else []
-        cmds.append("pip install -r %(reqpath)s")
+        cmds.append("pip install %(upgrade)s -r %(reqpath)s")
         sudo_local(" && ".join(cmds) % ctx, user=env.CFG_INVENIO_USER)
 
 
@@ -231,6 +231,9 @@ def venv_create():
     basename = os.path.basename(env.CFG_INVENIO_PREFIX)
 
     sudo_local("mkdir -p %s" % dirname, user=env.CFG_INVENIO_USER)
+    if confirm("Create %(CFG_INVENIO_PREFIX)s with sudo?" % env):
+        sudo_local("mkdir -p %(CFG_INVENIO_PREFIX)s" % env)
+        sudo_local("chown %(CFG_INVENIO_USER)s:%(CFG_INVENIO_USER)s %(CFG_INVENIO_PREFIX)s" % env)
     sudo_local("cd %s && virtualenv -p %s %s" % (dirname, env.PYTHON, basename), user=env.CFG_INVENIO_USER)
 
     # Create needed symboic links

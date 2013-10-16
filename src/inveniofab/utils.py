@@ -15,10 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 
-from fabric.api import prompt, env, abort, warn, get, put, roles, task, execute
+from fabric.api import prompt, env, abort, warn, get, put, task, \
+    puts, execute
 from fabric.api import local as fab_local, run as fab_run, sudo as fab_sudo
-from fabric.colors import red
+from fabric.colors import red, cyan
 from fabric.contrib.files import exists as fab_exists, append as fab_append
+from fabric.contrib.console import confirm
 from jinja2 import Environment, FileSystemLoader
 from jinja2.exceptions import TemplateNotFound
 import getpass
@@ -32,23 +34,23 @@ def is_local():
     return (env.host in ['localhost', '127.0.0.1'] or env.host is None)
 
 
-def run_local(command, shell=True, pty=True, combine_stderr=True, capture=False):
+def run_local(command, shell=True, pty=True, combine_stderr=True, capture=False, warn_only=False):
     """ run/local function based on host """
     if is_local():
         return fab_local(command, capture=capture)
     else:
-        return fab_run(command, shell=shell, pty=pty, combine_stderr=combine_stderr)
+        return fab_run(command, shell=shell, pty=pty, combine_stderr=combine_stderr, warn_only=warn_only)
 
 
-def sudo_local(command, shell=True, pty=True, combine_stderr=True, user=None, capture=False):
+def sudo_local(command, shell=True, pty=True, combine_stderr=True, user=None, capture=False, warn_only=False):
     """ sudo/local function based on host """
     if env.user == user:
-        return run_local(command, shell=shell, pty=pty, combine_stderr=combine_stderr, capture=capture)
+        return run_local(command, shell=shell, pty=pty, combine_stderr=combine_stderr, capture=capture, warn_only=warn_only)
     else:
         if is_local():
             return fab_local("sudo %s" % command, capture=capture)
         else:
-            return fab_sudo(command, shell=shell, pty=pty, combine_stderr=combine_stderr, user=user)
+            return fab_sudo(command, shell=shell, pty=pty, combine_stderr=combine_stderr, user=user, warn_only=warn_only)
 
 
 def exists_local(path, use_sudo=False, verbose=False):
@@ -110,7 +112,7 @@ def write_template(filename, context, tpl_str=None, tpl_file=None, remote_tpl_fi
         get(remote_tpl_file, f)
         tpl = env.jinja.from_string(f.getvalue())
         f.close()
-    if tpl_file:
+    elif tpl_file:
         try:
             tpl = env.jinja.get_template(tpl_file)
         except TemplateNotFound:
@@ -230,10 +232,53 @@ def _upload(fs):
 
 
 @task
-def upload_files():
+def upload_files(role=None):
     """
     Upload files specified by CFG_FILES
     """
-    for role, files in env.get('CFG_FILES', {}).items():
-        files = map(lambda f: _first(f, dirs=[env.env_name, 'common']), files)
-        execute(_upload, files, role=role)
+    for files_role, files in env.get('CFG_FILES', {}).items():
+        if role is None or role == files_role:
+            files = map(lambda f: _first(f, dirs=[env.env_name, 'common']), files)
+            execute(_upload, files, role=files_role)
+
+
+def _symlink(links, ignore):
+    for src, dst in links:
+        src = os.path.join(env.CFG_INVENIO_PREFIX, src)
+        basedir = os.path.dirname(src)
+        link = os.path.basename(src)
+        if not exists_local(basedir, use_sudo=True):
+            sudo_local("mkdir -p %s" % basedir, user=env.CFG_INVENIO_USER)
+        else:
+            if exists_local(src, use_sudo=True):
+                if ignore:
+                    continue
+                elif not confirm("%s already exists - remove?" % src):
+                    warn("Couldn't create link %s to %s" % (src, dst))
+                    continue
+                else:
+                    sudo_local("rm -Rf %s" % src)
+        sudo_local("cd %s; ln -s %s %s" % (basedir, dst, link), user=env.CFG_INVENIO_USER)
+
+
+@task
+def symlinks(ignore=False):
+    """
+    Create symlinks specified by CFG_SYMLINKS
+    """
+    for role, links in env.get('CFG_SYMLINKS', {}).items():
+        execute(_symlink, links, ignore, role=role)
+
+
+@task
+def sublime_project():
+    """ Write sublime project file """
+    from fabric.api import env
+    from inveniofab.utils import write_template
+
+    prjfile = os.path.join(
+        env.CFG_INVENIO_PREFIX,
+        '%s.sublime-project' % os.path.basename(env.CFG_INVENIO_PREFIX)
+    )
+    puts(cyan(">>> Writing Sublime project file to %s..." % prjfile))
+    write_template(prjfile, env, tpl_file='sublime-project.tpl')

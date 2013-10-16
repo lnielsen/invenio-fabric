@@ -20,12 +20,46 @@ Library tasks for configuring and running MySQL for Invenio.
 """
 
 from __future__ import with_statement
-from fabric.api import puts, task, env, local, abort, settings, hide, roles
+from fabric.api import puts, task, env, local, abort, settings, hide, roles,\
+    execute
 from fabric.colors import red, cyan
 from fabric.contrib.console import confirm
 from inveniofab.env import env_get
-from inveniofab.utils import prompt_and_check, exists_local, sudo_local
+from inveniofab.utils import prompt_and_check, exists_local, sudo_local, \
+    write_template
+from jinja2.exceptions import TemplateNotFound
 import os
+
+
+@task
+def mysql_conf_type(conf='', name=''):
+    """ Upload and update MySQL configuration """
+    puts(cyan(">>> Configuring MySQL (%s)..." % name))
+
+    conf_files = [(conf, '/etc/my.cnf')]
+
+    ctx = {}
+    ctx.update(env)
+
+    for local_file, remote_file in conf_files:
+        print local_file
+        puts(">>> Writing %s ..." % remote_file)
+
+        try:
+            write_template(remote_file, ctx, tpl_file=local_file, use_sudo=True)
+        except TemplateNotFound:
+            abort(red("Could not find template %s" % local_file))
+
+    if confirm(cyan("Reload MySQL daemon?")):
+        sudo_local("service mysqld reload")
+
+
+@task
+def mysql_conf():
+    if 'db-master' in env.CFG_DATABASE_CONF:
+        execute(mysql_conf_type, conf=env.CFG_DATABASE_CONF['db-master'], name='db-master', roles=['db-master'], )
+    if 'db-slave' in env.CFG_DATABASE_CONF:
+        execute(mysql_conf_type, conf=env.CFG_DATABASE_CONF['db-slave'], name='db-slave', roles=['db-slave'])
 
 
 @task
@@ -60,12 +94,15 @@ def mysql_dropdb(stored_answers=None):
 
         local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "DROP DATABASE IF EXISTS %(name)s"' % ctx)
         with settings(warn_only=True):
-            local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "REVOKE ALL PRIVILEGES ON %(name)s.* FROM %(user)s@\'%%.cern.ch\'"' % ctx)
+            for user_host in env.get('CFG_DATABASE_GRANT_HOSTS', ['%']):
+                ctx.update({'user_host': user_host})
+                local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "REVOKE ALL PRIVILEGES ON %(name)s.* FROM %(user)s@\'%(user_host)s\'"' % ctx)
         local('mysqladmin %(user_pw)s -h %(host)s -P %(port)s flush-privileges' % ctx)
 
 
 @task
-def mysql_createdb(stored_answers=None):
+@roles('db-master')
+def mysql_createdb(stored_answers=None,):
     """
     Create database and user
     """
@@ -96,7 +133,9 @@ def mysql_createdb(stored_answers=None):
 
         # Run commands
         local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "CREATE DATABASE IF NOT EXISTS %(name)s DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci"' % ctx)
-        local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "GRANT ALL PRIVILEGES ON %(name)s.* TO %(user)s@\'%%.cern.ch\' IDENTIFIED BY \'%(password)s\';"' % ctx)
+        for user_host in env.get('CFG_DATABASE_GRANT_HOSTS', ['%']):
+            ctx.update({'user_host': user_host})
+            local('mysql %(user_pw)s -h %(host)s -P %(port)s -e "GRANT ALL PRIVILEGES ON %(name)s.* TO %(user)s@\'%(user_host)s\' IDENTIFIED BY \'%(password)s\';"' % ctx)
         local('mysqladmin %(user_pw)s -h %(host)s -P %(port)s flush-privileges' % ctx)
 
 

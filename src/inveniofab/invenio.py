@@ -81,7 +81,8 @@ def invenio_conf():
                 write_template(invenio_local_remote, env, tpl_str=INVENIO_LOCAL_TPL, use_sudo=True)
 
     if confirm(cyan("Run config update")):
-        inveniocfg("--update-all")
+        inveniomanage("config update")
+        inveniomanage("bibfield config load")
 
 
 @task
@@ -97,7 +98,7 @@ def invenio_upgrade():
 def invenio_createdb():
     """ Create Invenio tables """
     puts(cyan(">>> Creating Invenio tables..." % env))
-    inveniocfg("--create-tables")
+    inveniomanage("database create")
 
 
 @task

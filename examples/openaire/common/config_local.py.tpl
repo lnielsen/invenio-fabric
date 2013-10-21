@@ -8,7 +8,7 @@ import os
 
 SRC_PATH = [
     os.path.expanduser("{{CFG_INVENIO_SRCDIR}}"),
-    os.path.expanduser("{{CFG_OPENAIRE_SRCDIR}}"),
+    os.path.expanduser("{{CFG_ZENODO_SRCDIR}}"),
 ]
 
 DIRS = {

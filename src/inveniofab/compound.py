@@ -71,15 +71,13 @@ def bootstrap(with_db=True, quite=False, **kwargs):
     _confirm_step(venv_requirements)
     _confirm_step(repo_install, targets_key='bootstrap_targets')
     _confirm_step(invenio_conf)
-    if env.WITH_DEVSERVER:
-        _confirm_step(devserver_conf)
     if with_db:
         _confirm_step(invenio_createdb)
     # FIXME: Generalize below to have hooks in the bootstrap process, which can be
     # customized for each individual overlay (e.g. OpenAIRE/INSPIRE needs to create
     # extra tables etc., load demo records?)
-    if env.CFG_INSPIRE_SITE:
-        _confirm_step(inspire_dbchanges)
+    #if env.CFG_INSPIRE_SITE:
+    #    _confirm_step(inspire_dbchanges)
 
 
 @task

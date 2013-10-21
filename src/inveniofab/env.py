@@ -184,9 +184,9 @@ Tasks
 """
 
 from fabric import state
-from fabric.api import execute, abort, task
+from fabric.api import execute, abort, task, run
 from fabric.api import task, abort
-from inveniofab.utils import pythonbrew_versions
+from inveniofab.utils import run_local
 from jinja2 import Environment, FileSystemLoader
 import copy
 import os
@@ -328,17 +328,7 @@ def env_defaults(env, name='invenio', prefix=None, python=None, **kwargs):
     if python is None:
         pythonbin = 'python'
     else:
-        if os.path.exists(python):
-            pythonbin = python
-        else:
-            python_versions = pythonbrew_versions()
-            if python in python_versions:
-                pythonbin = python_versions[python]
-            else:
-                python_versions = python_versions.keys()
-                python_versions.sort()
-                abort("Unknown Python version %s. Available versions are %s" % (
-                      python, ", ".join(python_versions)))
+        pythonbin = python
 
     env.update({
         'NAME': name,
@@ -441,7 +431,8 @@ def env_make_name(prefix, python, ref):
     """ Generate a MySQL friendly environment name. """
     ref = ref.split("/")
     ref = ref[-1].replace("-", "_")
-    python = python.replace(".", "")
+    if python:
+        python = run_local(("%s -c \"import sys;print str(sys.version_info[0]) + str(sys.version_info[1])\"") % python, capture=True)
 
     prefix = prefix.replace("_", "").replace("-", "")
 

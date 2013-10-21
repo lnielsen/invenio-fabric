@@ -233,7 +233,7 @@ def venv_create():
     sudo_local("mkdir -p %s" % dirname, user=env.CFG_INVENIO_USER)
     if confirm("Create %(CFG_INVENIO_PREFIX)s with sudo?" % env):
         sudo_local("mkdir -p %(CFG_INVENIO_PREFIX)s" % env)
-        sudo_local("chown %(CFG_INVENIO_USER)s:%(CFG_INVENIO_USER)s %(CFG_INVENIO_PREFIX)s" % env)
+        sudo_local("chown %(CFG_INVENIO_USER)s:`id -g -n %(CFG_INVENIO_USER)s` %(CFG_INVENIO_PREFIX)s" % env)
     sudo_local("cd %s && virtualenv -p %s %s" % (dirname, env.PYTHON, basename), user=env.CFG_INVENIO_USER)
 
     # Create needed symboic links
